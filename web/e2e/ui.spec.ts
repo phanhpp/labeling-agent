@@ -17,6 +17,9 @@ async function openJob(page: Page, jobId: string) {
 test("browse lists the labels and filters by chip, kept in the URL", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("tbody tr")).toHaveCount(14);
+  // every section of the policy is a filter, also one no posting matches (§3, 0)
+  await expect(page.locator(".filters .chip", { hasText: "§3" })).toContainText("0");
+  await expect(page.locator(".filters .chip", { hasText: /§\d/ })).toHaveCount(5);
   await page.getByRole("button", { name: /VIOLATING/ }).click();
   await expect(page).toHaveURL(/label=VIOLATING/);
   await expect(page.locator("tbody tr")).toHaveCount(3);
@@ -95,7 +98,7 @@ test("clicking a row opens the posting; back to the list keeps the filter; next 
   await page.goto("/?label=NEEDS_REVIEW");
   const rows = page.locator("tbody tr");
   await expect(rows).toHaveCount(6);
-  await rows.nth(0).locator("td").nth(4).click(); // a cell, not the title link
+  await rows.nth(0).locator("td.why").click(); // a cell, not the title link
   await expect(page).toHaveURL(/\/labels\/\d+/);
   const first = page.url();
   await page.getByRole("link", { name: "Next posting →" }).click();
@@ -165,10 +168,24 @@ test("roles on a draft: a viewer reads, an editor submits, an editing publisher 
 
 test("the side panel folds, shows an older version without changing what is live, and compares versions", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Fold the side panel" }).click();
+  await page.getByRole("button", { name: "Hide the workspace" }).click();
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeHidden();
-  await page.getByRole("button", { name: "Open the side panel" }).click();
+  await page.getByRole("button", { name: "Show the workspace" }).click();
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeVisible();
+  // the same with the shortcut, like Cursor's secondary sidebar
+  await page.keyboard.press("ControlOrMeta+Alt+KeyB");
+  await expect(page.getByRole("complementary", { name: "Side panel" })).toBeHidden();
+  await page.keyboard.press("ControlOrMeta+Alt+KeyB");
+  await expect(page.getByRole("complementary", { name: "Side panel" })).toBeVisible();
+
+  // the list's filters hide too; the list keeps its filter, and the hidden toggle shows a dot
+  await page.getByRole("button", { name: "NEEDS REVIEW" }).click();
+  await page.getByRole("button", { name: "Hide the filters" }).click();
+  await expect(page.getByLabel("Search job id")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Show the filters" })).toHaveClass(/has-dot/);
+  await page.keyboard.press("ControlOrMeta+KeyB");
+  await expect(page.getByLabel("Search job id")).toBeVisible();
+  await page.getByRole("button", { name: "NEEDS REVIEW" }).click();
 
   await page.getByLabel("Policy shown").selectOption("v1");
   await expect(page.getByTestId("viewing")).toContainText("Showing policy v1 · live is v2");
@@ -198,7 +215,7 @@ test("an editor discards a draft; published versions have no discard", async ({ 
   await page.getByRole("button", { name: /^Create a draft from v2/ }).click();
   await expect(page.getByRole("heading", { name: /Policy v3/ })).toBeVisible();
   await page.getByRole("button", { name: "Discard this draft" }).click();
-  await expect(page.getByText("Discard v3 and its Test? This can't be undone.")).toBeVisible();
+  await expect(page.getByText("Discard v3? It has no Test labels. This can't be undone.")).toBeVisible();
   await page.getByRole("button", { name: "Discard", exact: true }).click();
   await expect(page.getByText("Draft v3 discarded.")).toBeVisible();
   await expect(page.locator("tr", { hasText: "v3" })).toHaveCount(0);

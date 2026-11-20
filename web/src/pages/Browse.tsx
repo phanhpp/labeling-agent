@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api, type LabelRow } from "../api";
+import { PanelToggle, usePanelShortcut } from "../components/PanelToggle";
 import { PolicyMatch } from "../components/PolicyMatch";
 import { ErrorNote, LabelBadge, color, useLoad } from "../components/ui";
-import { useShared } from "../context";
-import { DEFAULT_PER, LABELS, PAGE_SIZES, pageWindow, readFilters, toParams, toggle, type Filters } from "../lib/filters";
+import { store, stored, useShared } from "../context";
+import { DEFAULT_PER, LABELS, PAGE_SIZES, pageWindow, readFilters, sectionCodes, toParams, toggle, type Filters } from "../lib/filters";
 import { saveListContext } from "../lib/listContext";
 import { field } from "../lib/words";
 
@@ -26,9 +27,17 @@ export default function Browse() {
   const { offset } = pageWindow(filters);
   const pages = data ? Math.max(1, Math.ceil(data.total / per)) : 1;
 
+  // The filters hide like a sidebar (⌘B); the list then takes the whole width. On a phone they start hidden.
+  const [filtersOpen, setFiltersOpen] = useState(() => stored("filters", window.innerWidth > 900 ? "open" : "hidden") === "open");
+  const toggleFilters = () => {
+    store("filters", filtersOpen ? "hidden" : "open");
+    setFiltersOpen(!filtersOpen);
+  };
+  usePanelShortcut("filters", toggleFilters);
+  const filtering = !!(filters.label || filters.section || filters.job_id);
+
   const filtersPanel = (
     <div className="filters" aria-label="Filters">
-      <div className="group-head">Filter this list</div>
         <input
           className="search"
           placeholder="Search job id"
@@ -51,10 +60,11 @@ export default function Browse() {
           </button>
         ))}
         <div className="label-text">Policy section</div>
-        {Object.entries(data?.counts.section ?? {}).map(([code, n]) => (
+        {/* every section of the policy shown, also those no posting matches (0) */}
+        {sectionCodes(sections, data?.counts.section ?? {}).map(([code, n]) => (
           <button
             key={code}
-            className={`chip ${filters.section === code ? "on" : ""}`}
+            className={`chip ${filters.section === code ? "on" : ""} ${n === 0 ? "zero" : ""}`}
             aria-pressed={filters.section === code}
             onClick={() => set(toggle(filters, "section", code))}
           >
@@ -66,8 +76,15 @@ export default function Browse() {
   );
 
   return (
-    <div className="page browse">
-      <aside>{filtersPanel}</aside>
+    <div className={`page browse ${filtersOpen ? "" : "filters-hidden"}`}>
+      <aside className="filters-col">
+        <div className="filters-head">
+          {/* a dot on the hidden toggle says the list is filtered */}
+          <PanelToggle panel="filters" side="left" open={filtersOpen} onToggle={toggleFilters} dot={!filtersOpen && filtering} />
+          {filtersOpen && <span className="group-head">Filter this list</span>}
+        </div>
+        {filtersOpen && filtersPanel}
+      </aside>
 
       <main>
         <ErrorNote error={error} />

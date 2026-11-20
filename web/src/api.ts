@@ -68,7 +68,7 @@ export type CompareRow = {
   old: { label_id: number; label: string; sections: string[] }; new: { label_id: number; label: string; sections: string[] };
 };
 export type Comparison = { old: string; new: string; postings: number; changed: number; from_the_change: number; rows: CompareRow[] };
-export type Policy = Version & { body: any; relabel_scope?: number; diff?: { against: string; changes: { where: string; change: string; models_see_it: boolean }[] } };
+export type Policy = Version & { body: any; relabel_scope?: number; test_labels?: number; diff?: { against: string; changes: { where: string; change: string; models_see_it: boolean }[] } };
 export type Flip = { job_id: string; label_id: number; before: { label: string; sections: string[] }; after: { label: string; sections: string[] }; from_the_change: boolean };
 export type Report = {
   version: string; compared_with: string; mode: string; jobs: Record<string, number>; labeled: number;

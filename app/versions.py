@@ -125,6 +125,12 @@ async def discard_draft(conn: AsyncConnection, name: str) -> dict:
     return {"discarded": name, "labels_deleted": labels}
 
 
+async def test_labels(conn: AsyncConnection, name: str) -> int:
+    """Labels made under a draft by any of its Tests, including Tests of content it no longer has."""
+    query = "SELECT count(*) AS n FROM labels WHERE policy_version = %s"
+    return (await (await conn.execute(query, (name,))).fetchone())["n"]
+
+
 def relabel_mode(new: dict, old: dict) -> str:
     """re-decide when the models would see exactly the same thing (only effects changed), else full."""
     return "redecide" if new["model_hash"] == old["model_hash"] else "full"

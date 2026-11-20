@@ -2,23 +2,14 @@ import { useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useShared, type Tagged } from "../context";
 import { USERS } from "../roles";
+import { PanelToggle } from "./PanelToggle";
 import { RelabelProgress, useRelabel } from "./Relabel";
 
 const tagWords = (v: Tagged) => (v.tags.length ? ` (${v.tags.join(", ")})` : "");
 
-// Chevrons for folding and opening the panel.
-export function Chevron({ direction }: { direction: "left" | "right" }) {
-  const d = direction === "left" ? "M10 3 5 8l5 5M14 3 9 8l5 5" : "M6 3l5 5-5 5M2 3l5 5-5 5";
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 // The Workspace panel on the right: who you are, which policy version the pages show, and comparing
-// the latest version with the previous one. It folds to a thin rail, and its left edge can be
-// dragged to resize it.
+// the latest version with the previous one. It hides to a thin strip (the toggle stays in the same
+// place, top right), and its left edge can be dragged to resize it.
 export function SidePanel() {
   const { user, setUser, versions, live, latest, previous, viewing, setViewing, setPanelOpen, setPanelWidth } = useShared();
   const navigate = useNavigate();
@@ -44,9 +35,7 @@ export function SidePanel() {
     <aside className="side" aria-label="Side panel" ref={box}>
       <div className="side-head">
         <div className="group-head" style={{ margin: 0 }}>Workspace <span className="muted small">(every page)</span></div>
-        <button className="icon" onClick={() => setPanelOpen(false)} aria-label="Fold the side panel" title="Fold the panel">
-          <Chevron direction="right" />
-        </button>
+        <PanelToggle panel="workspace" side="right" open onToggle={() => setPanelOpen(false)} />
       </div>
 
       <section>

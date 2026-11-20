@@ -31,7 +31,7 @@ export default function Version() {
         {data.edited_by.length > 0 && <> · edited by {data.edited_by.join(", ")}</>}
         {data.published_by && <> · {who(data.published_by, "published")}</>}
       </p>
-      {isDraft && user.role !== "viewer" && <Discard name={data.name} notify={setMessage} />}
+      {isDraft && user.role !== "viewer" && <Discard name={data.name} labels={data.test_labels ?? 0} notify={setMessage} />}
       {message && <p className="message" role="status">{message}</p>}
       {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={refresh} />}
       {data.diff && <Changes policy={data} />}
@@ -67,7 +67,7 @@ function DraftGuide({ policy }: { policy: Policy }) {
 }
 
 // Throw a draft away, with its Test. Published versions can't be: every label traces to its policy.
-function Discard({ name, notify }: { name: string; notify: (m: string) => void }) {
+function Discard({ name, labels, notify }: { name: string; labels: number; notify: (m: string) => void }) {
   const { refreshVersions } = useShared();
   const navigate = useNavigate();
   const [asking, setAsking] = useState(false);
@@ -80,7 +80,9 @@ function Discard({ name, notify }: { name: string; notify: (m: string) => void }
     <div className="discard">
       {asking ? (
         <span className="confirm">
-          Discard {name} and its Test? This can't be undone.
+          {labels > 0
+            ? `Discard ${name} and the ${labels} labels its Tests made? This can't be undone.`
+            : `Discard ${name}? It has no Test labels. This can't be undone.`}
           <button className="small" onClick={discard}>Discard</button>
           <button className="small" onClick={() => setAsking(false)}>Keep it</button>
         </span>

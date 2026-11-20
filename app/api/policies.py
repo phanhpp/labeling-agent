@@ -80,6 +80,8 @@ async def read_version(
         if row["status"] == "draft" and row["parent"]:
             # how many postings Publish would label again: a Test of that many leaves Publish nothing to run
             out["relabel_scope"] = await versions.relabel_scope(conn, row["parent"])
+            # every label its Tests made, also for content it no longer has: discarding deletes them all
+            out["test_labels"] = await versions.test_labels(conn, name)
     if other is not None:
         out["diff"] = {"against": diff, "changes": policies.diff(other["body"], row["body"])}
     return out

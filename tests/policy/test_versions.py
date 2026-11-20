@@ -387,6 +387,10 @@ async def test_a_draft_is_discarded_with_its_test_and_its_name_is_free_again(api
     count = "SELECT count(*) AS n FROM checkpoints WHERE thread_id = ANY(%s)"
     assert (await sql(api, count, (threads,)))[0]["n"] > 0
 
+    # an edit makes the Test's labels outdated, but they still go with the draft: the page counts them
+    await api.put("/policies/drafts/v2", json={"body": effects_only()}, headers=as_("editor"))
+    assert (await api.get("/policies/v2", headers=as_("viewer"))).json()["test_labels"] == 2
+
     assert (await api.delete("/policies/drafts/v2", headers=as_("viewer"))).status_code == 403
     out = await api.delete("/policies/drafts/v2", headers=as_("editor"))
     assert out.status_code == 200 and out.json() == {"discarded": "v2", "labels_deleted": 2}

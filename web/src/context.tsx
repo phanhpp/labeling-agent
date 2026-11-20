@@ -28,14 +28,14 @@ type Shared = {
 };
 const Context = createContext<Shared | null>(null);
 
-function stored(key: string, fallback: string | null): string | null {
+export function stored(key: string, fallback: string | null): string | null {
   try {
     return localStorage.getItem(key) ?? fallback;
   } catch {
     return fallback;
   }
 }
-function store(key: string, value: string | null) {
+export function store(key: string, value: string | null) {
   try {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);

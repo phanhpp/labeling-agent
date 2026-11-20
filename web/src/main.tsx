@@ -2,7 +2,8 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes, useLocation } from "react-router";
 import { api } from "./api";
-import { Chevron, SidePanel } from "./components/SidePanel";
+import { SHORTCUT, SidebarIcon, usePanelShortcut } from "./components/PanelToggle";
+import { SidePanel } from "./components/SidePanel";
 import { useLoad } from "./components/ui";
 import { SharedProvider, useShared } from "./context";
 import Browse from "./pages/Browse";
@@ -62,26 +63,30 @@ function ScrollToTop() {
 
 function App() {
   const { user, viewing, panelOpen, setPanelOpen, panelWidth } = useShared();
+  usePanelShortcut("workspace", () => setPanelOpen(!panelOpen));
   return (
     <>
       <ScrollToTop />
       <Header />
       <div className={`layout ${panelOpen ? "" : "folded"}`} style={{ "--side-w": `${panelWidth}px` } as React.CSSProperties}>
-        {/* key: switching user or version reloads the page's data */}
-        <Routes key={`${user.key}-${viewing ?? "live"}`}>
-          <Route path="/" element={<Browse />} />
-          <Route path="/labels/:id" element={<Decision />} />
-          <Route path="/versions" element={<Versions />} />
-          <Route path="/versions/:name" element={<Version />} />
-          <Route path="/compare" element={<Compare />} />
-          <Route path="*" element={<p className="page">Page not found.</p>} />
-        </Routes>
+        <div className="main">
+          {/* key: switching user or version reloads the page's data */}
+          <Routes key={`${user.key}-${viewing ?? "live"}`}>
+            <Route path="/" element={<Browse />} />
+            <Route path="/labels/:id" element={<Decision />} />
+            <Route path="/versions" element={<Versions />} />
+            <Route path="/versions/:name" element={<Version />} />
+            <Route path="/compare" element={<Compare />} />
+            <Route path="*" element={<p className="page">Page not found.</p>} />
+          </Routes>
+        </div>
         {panelOpen ? (
           <SidePanel />
         ) : (
-          <button className="rail" onClick={() => setPanelOpen(true)} aria-label="Open the side panel" title="Open the workspace">
-            <Chevron direction="left" />
-            <span className="rail-text">Workspace</span>
+          <button className="side-rail tip tip-end" onClick={() => setPanelOpen(true)} aria-label="Show the workspace" aria-expanded={false}
+            data-tip={`Show workspace   ${SHORTCUT.workspace}`}>
+            <span className="side-rail-icon"><SidebarIcon side="right" /></span>
+            <span className="side-rail-text">Workspace</span>
           </button>
         )}
       </div>

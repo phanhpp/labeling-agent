@@ -65,10 +65,16 @@ CREATE TABLE IF NOT EXISTS jobs (
     locked_at       timestamptz,
     batch_id        bigint REFERENCES batches (id),
     last_error      text,
-    created_at      timestamptz NOT NULL DEFAULT now()
+    run_after       timestamptz NOT NULL DEFAULT now(),  -- a failed job waits before its next try
+    thread_id       text,                           -- its LangGraph thread, set when claimed
+    checkpoints_pruned boolean NOT NULL DEFAULT false,   -- its LangGraph thread was deleted after 7 days
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    finished_at     timestamptz
 );
 
 CREATE INDEX IF NOT EXISTS jobs_to_claim ON jobs (status, queue, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS one_open_job ON jobs (posting_id, policy_version)
+    WHERE status IN ('queued', 'running');  -- never two open jobs for one posting and version
 
 -- One label per (posting, policy version, model version). Older versions' labels are kept.
 CREATE TABLE IF NOT EXISTS labels (

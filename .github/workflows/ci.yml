@@ -3,6 +3,9 @@
 #   api   import check with runtime packages only (proves the Docker image will be complete),
 #         then lint, format and the test suite against a throwaway Postgres, on Python 3.12.
 #         Tests marked e2e (real models) or data (needs the 50 MB dataset) are left out.
+#   no-keys  the fresh-clone path: cp .env.example .env && docker compose up. Without keys the API
+#         accepts and queues postings and /health says live_labeling false; with the fake backend a
+#         posting is labeled end to end through the real containers.
 
 name: CI
 
@@ -58,6 +61,7 @@ jobs:
           uv run --no-dev --frozen python -c "import app.config, app.db, app.dataset, app.policy,
           app.agent.clean, app.agent.quotes, app.agent.check, app.agent.decide, app.agent.cache,
           app.agent.graph, app.agent.llm, app.agent.fake_models, app.agent.screen, app.agent.checkpoints,
+          app.store, app.queue, app.auth, app.api.main, app.worker,
           eval.run_eval, eval.metrics, scripts.load_data, scripts.fit_cutoff"
 
       - run: uv sync --frozen
@@ -68,3 +72,40 @@ jobs:
 
       - name: Tests (no model calls, no dataset download)
         run: uv run pytest -m "not e2e and not data" -q
+
+  no-keys:
+    name: no-keys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start from .env.example, as a fresh clone does
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait
+
+      - name: Without keys, postings are accepted and wait in the queue
+        run: |
+          curl -sf localhost:8000/health | tee health.json
+          python3 -c "import json; h = json.load(open('health.json')); assert h['live_labeling'] is False, h"
+          curl -sf -X POST localhost:8000/v1/postings -H "Authorization: Bearer demo-marketplace" \
+            -H "content-type: application/json" -d '{"job_id": "ci-1", "title": "Clerk"}'
+          code=$(curl -s -o /dev/null -w "%{http_code}" localhost:8000/v1/postings/ci-1/label \
+            -H "Authorization: Bearer demo-marketplace")
+          test "$code" = 202
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: With the fake backend, a posting is labeled end to end
+        run: |
+          sed -i 's/^LLM_BACKEND=.*/LLM_BACKEND=fake/' .env
+          docker compose up -d --wait
+          uv run --frozen python -m scripts.smoke --timeout 60
+
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color

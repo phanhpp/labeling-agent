@@ -80,10 +80,12 @@ def record_for(item: dict, state: dict, latency_ms: int) -> dict:
     }
 
 
-async def run(items: list[dict], config_name: str, concurrency: int, out: Path) -> list[dict]:
-    policy = policies.load_file(policies.POLICIES_DIR / "v1.yaml")
+async def run(
+    items: list[dict], config_name: str, concurrency: int, out: Path, version: str = "v1"
+) -> list[dict]:
+    policy = policies.load_file(policies.POLICIES_DIR / f"{version}.yaml")
     config = CONFIGS[config_name]
-    context = Context(policy=policy, policy_version="v1", config=config)
+    context = Context(policy=policy, policy_version=version, config=config)
     graph = build()
     gate = asyncio.Semaphore(concurrency)
     records: list[dict] = []
@@ -142,12 +144,18 @@ def split_items(split: str, limit: int | None, seed: int = 42) -> list[dict]:
     ]
 
 
-def suite_items(name: str) -> list[dict]:
+def suite_items(name: str, version: str = "v1") -> list[dict]:
+    """A suite's rows. A row may give its expectation per policy version (expect_by_version), as in
+    the policy_change suite; rows with nothing for this version are left out."""
     lines = (SUITES / f"{name}.jsonl").read_text().splitlines()
-    return [
-        {"job_id": row["id"], "raw": row["posting"], "expect": row["expect"], "gold": row.get("gold")}
-        for row in map(json.loads, filter(None, lines))
-    ]
+    items = []
+    for row in map(json.loads, filter(None, lines)):
+        expect = row.get("expect_by_version", {}).get(version, row.get("expect"))
+        if expect is not None:
+            items.append(
+                {"job_id": row["id"], "raw": row["posting"], "expect": expect, "gold": row.get("gold")}
+            )
+    return items
 
 
 def main() -> None:
@@ -161,6 +169,7 @@ def main() -> None:
     parser.add_argument("--name", help="the run folder's name (default: date-config-source)")
     parser.add_argument("--frozen", action="store_true", help="required for --split eval")
     parser.add_argument("--gate", action="store_true", help="exit 1 if the run misses thresholds.yaml")
+    parser.add_argument("--policy", default="v1", help="the policy version file to label under")
     args = parser.parse_args()
 
     if settings.llm_backend() == "fake":
@@ -170,18 +179,19 @@ def main() -> None:
             "--split eval is the frozen eval: pass --frozen, and change nothing after reading it"
         )
 
-    items = split_items(args.split, args.limit) if args.split else suite_items(args.suite)
-    source_name = args.split or f"suite-{args.suite}"
+    items = split_items(args.split, args.limit) if args.split else suite_items(args.suite, args.policy)
+    source_name = (args.split or f"suite-{args.suite}") + ("" if args.policy == "v1" else f"-{args.policy}")
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M")
     name = args.name or f"{stamp}-{args.config}-{source_name}" + (f"-{args.limit}" if args.limit else "")
     folder = RUNS / name
-    records = asyncio.run(run(items, args.config, args.concurrency, folder / "results.jsonl"))
+    records = asyncio.run(run(items, args.config, args.concurrency, folder / "results.jsonl", args.policy))
 
     summary = {
         "run": name,
         "config": args.config,
         "model_version": model_version(CONFIGS[args.config]),
         "source": source_name,
+        "policy_version": args.policy,
         "finished_at": datetime.now(UTC).isoformat(),
     }
     if args.suite:

@@ -10,6 +10,9 @@ edge_cases:
   min_pass_rate: 1.0
 adversarial:
   min_pass_rate: 1.0
+# Each policy version's expected changes (run once per version with --policy).
+policy_change:
+  min_pass_rate: 1.0
 dev50:
   min_main_recall: 0.43
   min_main_precision: 0.55

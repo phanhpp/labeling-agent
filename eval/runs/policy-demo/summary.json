@@ -1,0 +1,470 @@
+[
+ {
+  "version": "v2",
+  "from": "v1",
+  "changes": [
+   "header.labels",
+   "\u00a76"
+  ],
+  "mode": "full",
+  "tested": 100,
+  "flips": 13,
+  "changed": {
+   "NEEDS_REVIEW -> NEEDS_REVIEW": 21,
+   "ALLOWED -> ALLOWED": 69,
+   "ALLOWED -> NEEDS_REVIEW": 8,
+   "NEEDS_REVIEW -> ALLOWED": 2
+  },
+  "model_runs": 100,
+  "cost_usd": 0.4071,
+  "flip_list": [
+   {
+    "posting_id": 98,
+    "job_id": "17757",
+    "label_id": 102,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 100,
+    "job_id": "17806",
+    "label_id": 103,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a74",
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a74",
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 73,
+    "job_id": "11343",
+    "label_id": 128,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "from_the_change": false,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 55,
+    "job_id": "8489",
+    "label_id": 137,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "from_the_change": false,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 68,
+    "job_id": "10512",
+    "label_id": 148,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 45,
+    "job_id": "6558",
+    "label_id": 154,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "from_the_change": false,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 38,
+    "job_id": "5074",
+    "label_id": 156,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a74"
+     ]
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 48,
+    "job_id": "6693",
+    "label_id": 161,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 40,
+    "job_id": "5585",
+    "label_id": 171,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 21,
+    "job_id": "3022",
+    "label_id": 179,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "from_the_change": false,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 27,
+    "job_id": "3724",
+    "label_id": 181,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 17,
+    "job_id": "2535",
+    "label_id": 184,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "from_the_change": false,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 14,
+    "job_id": "2224",
+    "label_id": 188,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "from_the_change": false,
+    "gold": "legit"
+   }
+  ],
+  "flips_from_the_change": 7
+ },
+ {
+  "version": "v3",
+  "from": "v2",
+  "changes": [
+   "\u00a75.examples",
+   "\u00a75.screen",
+   "\u00a75.text"
+  ],
+  "mode": "full",
+  "tested": 100,
+  "flips": 8,
+  "changed": {
+   "ALLOWED -> ALLOWED": 70,
+   "NEEDS_REVIEW -> ALLOWED": 4,
+   "NEEDS_REVIEW -> NEEDS_REVIEW": 24,
+   "ALLOWED -> NEEDS_REVIEW": 1,
+   "NEEDS_REVIEW -> VIOLATING": 1
+  },
+  "model_runs": 100,
+  "cost_usd": 0.4152,
+  "flip_list": [
+   {
+    "posting_id": 12,
+    "job_id": "1334",
+    "label_id": 209,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "from_the_change": true,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 17,
+    "job_id": "2535",
+    "label_id": 217,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "from_the_change": true,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 37,
+    "job_id": "4918",
+    "label_id": 244,
+    "before": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": false,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 47,
+    "job_id": "6691",
+    "label_id": 249,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 80,
+    "job_id": "12769",
+    "label_id": 288,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "from_the_change": true,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 92,
+    "job_id": "17453",
+    "label_id": 293,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "after": {
+     "label": "ALLOWED",
+     "sections": []
+    },
+    "from_the_change": true,
+    "gold": "legit"
+   },
+   {
+    "posting_id": 100,
+    "job_id": "17806",
+    "label_id": 298,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a74",
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "after": {
+     "label": "VIOLATING",
+     "sections": [
+      "\u00a74",
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   },
+   {
+    "posting_id": 98,
+    "job_id": "17757",
+    "label_id": 299,
+    "before": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a75"
+     ]
+    },
+    "from_the_change": false,
+    "gold": "fraud"
+   }
+  ],
+  "flips_from_the_change": 6
+ },
+ {
+  "version": "v4",
+  "from": "v3",
+  "changes": [
+   "header.labels",
+   "\u00a74.effect"
+  ],
+  "mode": "redecide",
+  "tested": 100,
+  "flips": 1,
+  "changed": {
+   "NEEDS_REVIEW -> NEEDS_REVIEW": 25,
+   "VIOLATING -> NEEDS_REVIEW": 1,
+   "ALLOWED -> ALLOWED": 74
+  },
+  "model_runs": 0,
+  "cost_usd": 0.0,
+  "flip_list": [
+   {
+    "posting_id": 100,
+    "job_id": "17806",
+    "label_id": 303,
+    "before": {
+     "label": "VIOLATING",
+     "sections": [
+      "\u00a74",
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "after": {
+     "label": "NEEDS_REVIEW",
+     "sections": [
+      "\u00a74",
+      "\u00a75",
+      "\u00a76"
+     ]
+    },
+    "from_the_change": true,
+    "gold": "fraud"
+   }
+  ],
+  "flips_from_the_change": 1
+ }
+]

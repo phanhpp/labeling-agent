@@ -61,7 +61,7 @@ jobs:
           uv run --no-dev --frozen python -c "import app.config, app.db, app.dataset, app.policy,
           app.agent.clean, app.agent.quotes, app.agent.check, app.agent.decide, app.agent.cache,
           app.agent.graph, app.agent.llm, app.agent.fake_models, app.agent.screen, app.agent.checkpoints,
-          app.store, app.queue, app.auth, app.api.main, app.worker,
+          app.store, app.queue, app.auth, app.versions, app.api.main, app.api.policies, app.worker,
           eval.run_eval, eval.metrics, scripts.load_data, scripts.fit_cutoff, scripts.fit_injection"
 
       - run: uv sync --frozen

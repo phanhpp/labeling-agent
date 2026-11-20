@@ -39,6 +39,10 @@ PRUNE_EVERY_S = 3600
 KEEP_CHECKPOINTS_DAYS = 7
 
 
+class PolicyChanged(Exception):
+    """The job's draft was edited after the job was queued: its result would label old content."""
+
+
 class Worker:
     def __init__(self, pool, saver, agent: AgentConfig, concurrency: int = 4):
         self.pool = pool
@@ -59,7 +63,9 @@ class Worker:
         if key not in self._policies:
             row = await store.policy_version(conn, job["policy_version"])
             if row is None or row["content_hash"] != job["policy_hash"]:
-                raise RuntimeError(f"policy {job['policy_version']} changed after job {job['id']} was queued")
+                raise PolicyChanged(
+                    f"policy {job['policy_version']} changed after job {job['id']} was queued"
+                )
             self._policies[key] = row["body"]
         return self._policies[key]
 
@@ -110,6 +116,11 @@ class Worker:
     async def handle(self, job: dict) -> None:
         try:
             decision = await self.run_job(job)
+        except PolicyChanged:
+            async with self.pool.connection() as conn:
+                await jobs.cancel(conn, job, "draft changed before this job ran")
+            log.info("job %s skipped: its draft changed", job["id"])
+            return
         except Exception as error:  # noqa: BLE001 - any failure is a failed attempt
             reason = "timeout" if isinstance(error, TimeoutError) else type(error).__name__
             async with self.pool.connection() as conn:

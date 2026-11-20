@@ -95,14 +95,16 @@ def redecide(
     cleared_scores: dict[str, float] | None = None,
     injection: bool = False,
     failure: str | None = None,
-) -> Decision:
+) -> tuple[Decision, Checked | None]:
     """Label again under another policy version from what a label stored: no model call, $0.
+    Returns the decision and the checked findings it rests on (None if no model answered).
 
     Valid only when the two versions share a model_hash (only effects or wording the models never
     see changed), so the stored answer is the answer the model would give again.
     """
     checked = check(RawAnswer.model_validate(raw_output), policy, cleaned) if raw_output else None
-    return decide(policy, checked, cleared_scores=cleared_scores, injection=injection, failure=failure)
+    decision = decide(policy, checked, cleared_scores=cleared_scores, injection=injection, failure=failure)
+    return decision, checked
 
 
 def _from_findings(policy: dict, checked: Checked) -> Decision:

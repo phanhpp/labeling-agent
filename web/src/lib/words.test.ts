@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dollars, field, location, modelName, reason, reasonSentence, relabelSentence, stepName } from "./words";
+import { dollars, field, plural, location, modelName, reason, reasonSentence, relabelSentence, stepName } from "./words";
 
 describe("plain words", () => {
   it("puts reason codes into a sentence", () => {
@@ -42,5 +42,13 @@ describe("re-label progress", () => {
   it("writes small costs plainly", () => {
     expect(dollars(0.004)).toBe("under $0.01");
     expect(dollars(0.3)).toBe("$0.30");
+  });
+});
+
+describe("plural", () => {
+  it("adds an s except for one", () => {
+    expect(plural(1, "false alarm")).toBe("1 false alarm");
+    expect(plural(0, "false alarm")).toBe("0 false alarms");
+    expect(plural(3, "posting")).toBe("3 postings");
   });
 });

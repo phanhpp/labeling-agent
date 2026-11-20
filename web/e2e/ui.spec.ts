@@ -250,8 +250,9 @@ test("the live demo sends real postings, follows the run, and compares with the 
   await expect(page.getByTestId("run-scope")).toContainText("all 10 labeled");
   await expect(page.locator("tbody tr")).toHaveCount(10);
 
-  await panel.getByText("Compare with the dataset's label").click();
+  await page.locator(".listbar").getByText("Compare with the dataset's label").click(); // the list's own switch
   await expect(page.getByTestId("dataset-summary")).toContainText("10 postings with a dataset label");
+  await expect(panel.getByRole("checkbox", { name: "Compare with the dataset's label" })).toBeChecked(); // one setting
   await expect(page.locator("td.dataset-cell").first()).toContainText(/fraud|legitimate/);
   await page.locator("tbody tr").first().locator("td.why").click();
   await expect(page.getByTestId("dataset-line")).toContainText("The dataset marks this posting as");

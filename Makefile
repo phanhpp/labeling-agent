@@ -1,6 +1,6 @@
 # Short names for the commands in the README. Each line is the plain command; nothing is hidden.
 
-.PHONY: up up-fake demo demo-draft seed down reset api worker web test e2e lint eval-dev results demo-versions
+.PHONY: up up-fake demo demo-draft seed down reset api worker web test e2e lint eval-dev guardrails results demo-versions
 
 up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 	docker compose up -d --build --wait
@@ -11,7 +11,7 @@ up-fake:       ## the same, with a fake model: no keys, no cost
 demo:          ## a fresh stack: 100 real development postings labeled by Claude, and policy v2 as a draft (needs keys, about $0.35)
 	docker compose down -v
 	docker compose up -d --build --wait
-	uv run python -m scripts.submit_postings --split dev --limit 100
+	uv run python -m scripts.submit_postings --split dev --limit 100 --dataset-labels
 	uv run python -m scripts.demo_draft
 
 demo-draft:    ## load policy v2 (adds §6) as an untested draft, to Test and publish in the UI
@@ -51,6 +51,9 @@ lint:
 
 eval-dev:      ## real models on 50 development postings (about $0.20)
 	uv run python -m eval.run_eval --split dev --limit 50 --config jev_sonnet
+
+guardrails:    ## show the API's guardrails (413, partial batch, 403, 404, injection) against the running app
+	uv run python -m scripts.demo_guardrails
 
 results:       ## write RESULTS.md from the committed eval runs (needs the dataset CSV); --check is the CI-style test
 	uv run python -m eval.report

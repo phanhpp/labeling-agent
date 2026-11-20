@@ -76,3 +76,6 @@ export function relabelSentence(version: string, r: RelabelCounts): string {
   if (r.waiting) parts.push(`${r.waiting} waiting`);
   return `${head} ${parts.join(", ")}. Cost ${r.waiting ? "so far " : ""}${dollars(r.cost_usd)}.`;
 }
+
+// "1 false alarm", "2 false alarms".
+export const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;

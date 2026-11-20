@@ -67,3 +67,50 @@ async def test_a_crashed_run_resumes_after_the_screen(fresh_db_url, monkeypatch)
         json.dumps(state)  # the state is plain JSON, as checkpoints need
     finally:
         await pool.close()
+
+
+STRICT_RUN = """
+import asyncio, os, sys
+from app import policy as policies
+from app.agent import checkpoints
+from app.agent.configs import CONFIGS
+from app.agent.graph import build
+from app.agent.state import Context
+
+async def main():
+    url = os.environ["DATABASE_URL"]
+    await checkpoints.setup_checkpoints(url)
+    saver, pool = await checkpoints.open_checkpointer(url)
+    graph = build(checkpointer=saver)
+    config = {"configurable": {"thread_id": "strict"}}
+    v1 = policies.load_file(policies.POLICIES_DIR / "v1.yaml")
+    context = Context(policy=v1, policy_version="v1", config=CONFIGS["sonnet_only"])
+    posting = {"title": "Assembler", "description": "Pay the registration fee for your starter kit."}
+    await graph.ainvoke({"raw": posting}, config, context=context, durability="sync")
+    history = [s async for s in graph.aget_state_history(config)]  # loads every checkpoint
+    print(len(history), history[0].values["decision"]["label"])
+    await pool.close()
+
+asyncio.run(main())
+"""
+
+
+def test_checkpoints_load_with_strict_msgpack(fresh_db_url):
+    """With LANGGRAPH_STRICT_MSGPACK=true, loading a checkpoint may only build safe types (the
+    compose services run this way). Our state is plain JSON, so every checkpoint still loads."""
+    import os
+    import subprocess
+    import sys
+
+    env = {
+        **os.environ,
+        "LANGGRAPH_STRICT_MSGPACK": "true",
+        "LLM_BACKEND": "fake",
+        "DATABASE_URL": fresh_db_url,
+    }
+    out = subprocess.run(
+        [sys.executable, "-c", STRICT_RUN], env=env, capture_output=True, text=True, timeout=60
+    )
+    assert out.returncode == 0, out.stderr[-2000:]
+    steps, label = out.stdout.split()
+    assert int(steps) == 8 and label == "VIOLATING"

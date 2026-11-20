@@ -13,6 +13,12 @@ x-app: &app
       required: false
   environment:
     DATABASE_URL: postgresql://labeler:labeler@db:5432/labeler
+    # Loading a checkpoint may only build plain, safe types (our state is plain JSON), so a tampered
+    # checkpoint can't make LangGraph import and run code. tests/db/test_checkpoints.py checks it.
+    LANGGRAPH_STRICT_MSGPACK: "true"
+    # From the shell or .env, so `LLM_BACKEND=fake docker compose up` runs with no model calls.
+    LLM_BACKEND: ${LLM_BACKEND:-real}
+    AGENT_CONFIG: ${AGENT_CONFIG:-}
 
 services:
   db:

@@ -5,7 +5,7 @@
 #         Tests marked e2e (real models) or data (needs the 50 MB dataset) are left out.
 #   no-keys  the fresh-clone path: cp .env.example .env && docker compose up. Without keys the API
 #         accepts and queues postings and /health says live_labeling false; with the fake backend a
-#         posting is labeled end to end through the real containers.
+#         posting is labeled end to end through the real containers, and the UI fixtures seed.
 
 name: CI
 
@@ -105,6 +105,7 @@ jobs:
           sed -i 's/^LLM_BACKEND=.*/LLM_BACKEND=fake/' .env
           docker compose up -d --wait
           uv run --frozen python -m scripts.smoke --timeout 60
+          uv run --frozen python -m scripts.seed_fixtures
 
       - name: Container logs
         if: failure()

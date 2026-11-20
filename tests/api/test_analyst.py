@@ -168,3 +168,25 @@ async def test_the_decision_page_gets_the_marketplace_answer(api, worker):
     out = (await api.get(f"/ui/labels/{ids['p1']}", headers=as_("viewer"))).json()
     marketplace = (await api.get("/v1/postings/p1/label", headers=as_("marketplace"))).json()
     assert out["api_answer"] == marketplace
+
+
+async def test_the_list_keeps_the_same_order_under_every_policy_version(api, worker):
+    """Newest postings first, by arrival, whatever order each version's labels were made in."""
+    third = {"job_id": "p3", "title": "Courier", "description": "Deliver parcels around town. Paid hourly."}
+    await submit(api, POSTING, CLEAN, third)
+    await drain(worker)
+    v2 = policies.load_file(policies.POLICIES_DIR / "v2.yaml")
+    await api.post("/policies/drafts", json={"name": "v2", "body": v2}, headers=as_("editor"))
+    # the Test labels only the oldest posting first, so v2's labels are made in another order than v1's
+    await sql(api, "UPDATE postings SET created_at = created_at - interval '1 day' WHERE job_id = 'p1'")
+    await api.post("/policies/drafts/v2/test", params={"limit": 3}, headers=as_("editor"))
+    await drain(worker)
+    await api.post("/policies/drafts/v2/publish", headers=as_("publisher_b"))
+    await drain(worker)
+
+    def order(out):
+        return [row["job_id"] for row in out["items"]]
+
+    under_v1 = (await api.get("/ui/labels?version=v1", headers=as_("viewer"))).json()
+    under_v2 = (await api.get("/ui/labels?version=v2", headers=as_("viewer"))).json()
+    assert order(under_v1) == order(under_v2) == ["p3", "p2", "p1"]

@@ -8,6 +8,12 @@ async function actAs(page: Page, user: "viewer" | "editor" | "publisher_a" | "pu
   await page.getByLabel("Acting as").selectOption(user);
 }
 
+// Workspace sections fold away and start closed.
+async function openFold(page: Page, title: string) {
+  const fold = page.locator("details.fold", { hasText: title });
+  if (!(await fold.evaluate((d) => (d as HTMLDetailsElement).open))) await fold.locator("summary").click();
+}
+
 async function openJob(page: Page, jobId: string) {
   await page.goto(`/?job_id=${jobId}`);
   await page.locator("tbody tr").first().getByRole("link").click();
@@ -157,6 +163,7 @@ test("roles on a draft: a viewer reads, an editor submits, an editing publisher 
   await expect(page.getByText(/^Published\./)).toBeVisible();
   // The Test labeled all 14, so Publish kept them and ran nothing.
   await expect(page.getByTestId("relabel")).toContainText("All 14 recent postings are labeled under v2. 14 kept from the Test, 0 labeled again");
+  await openFold(page, "How labels changed");
   await expect(page.getByTestId("relabel-panel")).toContainText("v2: all 14 recent postings re-labeled, 14 kept from the Test");
   // Without reloading the page, the header and the side panel show v2 as latest and live.
   await expect(page.getByTestId("viewing")).toContainText("Showing policy v2 (live)");
@@ -177,6 +184,10 @@ test("the side panel folds, shows an older version without changing what is live
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeHidden();
   await page.keyboard.press("ControlOrMeta+Alt+KeyB");
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeVisible();
+  // the "Showing policy" label in the top bar opens the workspace on its policy picker
+  await page.getByRole("button", { name: "Hide the workspace" }).click();
+  await page.getByTestId("viewing").click();
+  await expect(page.getByLabel("Policy shown")).toBeFocused();
 
   // the list's filters hide too; the list keeps its filter, and the hidden toggle shows a dot
   await page.getByRole("button", { name: "NEEDS REVIEW" }).click();
@@ -202,6 +213,7 @@ test("the side panel folds, shows an older version without changing what is live
   await page.getByLabel("Policy shown").selectOption("v2");
   await expect(page.getByTestId("viewing")).toContainText("Showing policy v2 (live)");
 
+  await openFold(page, "How labels changed");
   await page.getByRole("button", { name: "Compare v1 → v2" }).click();
   await expect(page.getByRole("heading", { name: "How labels changed from v1 to v2" })).toBeVisible();
   const rows = page.getByTestId("compare").locator("tbody tr");
@@ -238,6 +250,7 @@ test("the live demo sends real postings, follows the run, and compares with the 
   test.skip(!health.demo?.enabled || !health.demo?.dataset, "needs DEMO_MODE and the dataset CSV");
   await page.goto("/");
   await actAs(page, "editor");
+  await openFold(page, "Live demo");
   const panel = page.getByTestId("live-run");
   await panel.getByLabel("How many postings to send").selectOption("10");
   await panel.getByRole("button", { name: "Send 10 postings" }).click();

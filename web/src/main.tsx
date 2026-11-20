@@ -25,10 +25,19 @@ function Header() {
           <NavLink to="/versions">Versions</NavLink>
         </nav>
         {live && (
-          <span className="viewing" data-testid="viewing">
+          <button
+            className="viewing"
+            data-testid="viewing"
+            title="Change the policy shown, in the workspace"
+            onClick={() => {
+              setPanelOpen(true);
+              // once the panel is open, put the cursor on its policy picker
+              setTimeout(() => document.querySelector<HTMLSelectElement>('select[aria-label="Policy shown"]')?.focus(), 0);
+            }}
+          >
             Showing policy <b>{viewing ?? live}</b>
             {viewing ? <> · live is <b>{live}</b></> : " (live)"}
-          </span>
+          </button>
         )}
         <span className="acting">
           <button className="whoami" onClick={() => setPanelOpen(true)} title="Change who you are in the side panel">

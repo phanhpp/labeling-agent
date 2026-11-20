@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { api, explain, type BatchSummary, type Health, type LiveRun as Run } from "../api";
 import { useShared } from "../context";
 import { dollars } from "../lib/words";
+import { Fold } from "./Fold";
 
 const SIZES = [10, 20, 30, 50, 100];
 const USD_PER_POSTING = 0.0035; // app/demo.py: $3.26 per 1,000 on dev 300 with Jev + Sonnet
@@ -50,8 +51,7 @@ export function LiveRunSection({ health }: { health: Health }) {
   };
 
   return (
-    <section data-testid="live-run">
-      <span className="label-text">Live demo: send real postings</span>
+    <Fold id="live-demo" title="Live demo: send real postings" testid="live-run" hint={run && run.waiting ? "run in progress" : undefined}>
       <div className="two">
         <select aria-label="How many postings to send" value={n} onChange={(e) => setN(Number(e.target.value))}>
           {SIZES.map((s) => <option key={s} value={s}>{s} postings</option>)}
@@ -78,7 +78,7 @@ export function LiveRunSection({ health }: { health: Health }) {
         Compare with the dataset's label
       </label>
       <p>Shows the dataset's own answer (fraud or not) next to ours, for postings sent this way. Off by default.</p>
-    </section>
+    </Fold>
   );
 }
 

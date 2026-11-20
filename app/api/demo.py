@@ -40,12 +40,14 @@ async def live_run(run: LiveRunIn, request: Request, user: User = Depends(requir
         raise HTTPException(409, "dataset_missing")
     seed = run.seed if run.seed is not None else random.randrange(1_000_000)
     async with _conn(request) as conn:
+        await _record_dataset_labels(conn)  # postings sent before (make demo) get theirs too
         sent = await (
-            await conn.execute("SELECT job_id FROM postings WHERE client_id = %s", (CLIENT,))
+            await conn.execute("SELECT job_id, raw FROM postings WHERE client_id = %s", (CLIENT,))
         ).fetchall()
+        sent_texts = frozenset(demo.ad_text(r["raw"]) for r in sent)
         # Twice as many as needed: a row the intake would refuse is skipped, not sent.
         candidates = demo.sample(
-            demo.pool(), run.n * 2, demo.MIXES[run.mix], seed, {r["job_id"] for r in sent}
+            demo.pool(), run.n * 2, demo.MIXES[run.mix], seed, {r["job_id"] for r in sent}, sent_texts
         )
         batch_id = await store.new_batch(conn, CLIENT)
         picked = fraud = 0
@@ -63,6 +65,34 @@ async def live_run(run: LiveRunIn, request: Request, user: User = Depends(requir
             if picked == run.n:
                 break
     return {"batch_id": batch_id, "postings": picked, "fraud": fraud, "seed": seed, "mix": run.mix}
+
+
+@router.post("/dataset-labels")
+async def record_dataset_labels(request: Request, user: User = Depends(require(*EDIT))):
+    """Save the dataset's answer for every posting the app holds that is a dataset row (make demo calls
+    this after sending its 100). Costs nothing, calls no model, changes no label."""
+    if not demo.enabled():
+        raise HTTPException(404, "not_found")
+    if not demo.dataset_ready():
+        raise HTTPException(409, "dataset_missing")
+    async with _conn(request) as conn:
+        return {"recorded": await _record_dataset_labels(conn)}
+
+
+async def _record_dataset_labels(conn) -> int:
+    rows = await (
+        await conn.execute(
+            "SELECT p.id, p.raw FROM postings p LEFT JOIN dataset_labels d ON d.posting_id = p.id"
+            " WHERE d.posting_id IS NULL"
+        )
+    ).fetchall()
+    recorded = 0
+    for row in rows:
+        fraudulent = demo.dataset_label_for(row["raw"])
+        if fraudulent is not None:
+            await store.save_dataset_label(conn, row["id"], fraudulent)
+            recorded += 1
+    return recorded
 
 
 def _keep_mix(candidates: list[dict], n: int, share: float | None, seed: int) -> list[dict]:

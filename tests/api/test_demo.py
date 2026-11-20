@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app import demo
-from tests.helpers import as_, drain, sql
+from tests.helpers import POSTING, as_, drain, sql, submit
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -43,6 +43,9 @@ def demo_on(monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "true")
     monkeypatch.setattr(demo, "dataset_ready", lambda: True)
     monkeypatch.setattr(demo, "pool", lambda: tuple(rows(40, 160)))
+    demo._by_job_id.cache_clear()  # it caches the pool by job id
+    yield
+    demo._by_job_id.cache_clear()
 
 
 async def send(api, n=10, mix="more_fraud", user="editor", **extra):
@@ -66,6 +69,16 @@ def test_a_sample_has_the_fraud_share_skips_sent_postings_and_repeats_with_its_s
     assert picked == demo.sample(pool, 20, 0.25, seed=3, skip={"f0", "l0"})
     real = demo.sample(pool, 50, None, seed=3, skip=set())
     assert len(real) == 50 and real == random.Random(3).sample(pool, 50)  # a plain random sample
+
+
+def test_a_sample_never_repeats_an_ad_already_sent_or_twice():
+    """The dataset has reposts: the same ad under different job ids."""
+    pool = rows(0, 10)
+    repost = {**pool[3], "job_id": "l3-again"}
+    picked = demo.sample([*pool, repost], 20, None, seed=1, skip=set(), skip_texts=frozenset())
+    assert len(picked) == 10 and "l3-again" not in {r["job_id"] for r in picked}
+    sent = frozenset({demo.ad_text(pool[0])})
+    assert pool[0] not in demo.sample(pool, 20, None, seed=1, skip=set(), skip_texts=sent)
 
 
 # ---------------------------------------------------------------- the endpoint
@@ -148,3 +161,19 @@ def test_the_agent_and_the_worker_never_read_the_dataset_label():
     ]
     readers = [p.name for p in code if re.search(r"dataset_labels|fraudulent", p.read_text())]
     assert readers == []
+
+
+async def test_postings_sent_before_get_their_dataset_label_too(api, worker, demo_on):
+    """make demo sends through the marketplace path, which saves no dataset label; this fills them in,
+    but only for a real dataset row: same job id and the same text."""
+    dataset_row = {k: v for k, v in rows(1, 0)[0].items() if k != "fraudulent"}
+    changed = {**{k: v for k, v in rows(0, 1)[0].items() if k != "fraudulent"}, "description": "Edited text."}
+    await submit(api, dataset_row, changed, POSTING)  # POSTING (p1) isn't in the dataset at all
+    assert (await api.post("/demo/dataset-labels", headers=as_("viewer"))).status_code == 403
+    out = await api.post("/demo/dataset-labels", headers=as_("editor"))
+    assert out.json() == {"recorded": 1}
+    saved = await sql(
+        api, "SELECT p.job_id, d.fraudulent FROM dataset_labels d JOIN postings p ON p.id = d.posting_id"
+    )
+    assert saved == [{"job_id": "f0", "fraudulent": True}]
+    assert (await api.post("/demo/dataset-labels", headers=as_("editor"))).json() == {"recorded": 0}

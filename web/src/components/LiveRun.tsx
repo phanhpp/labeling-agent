@@ -98,7 +98,10 @@ function RunResult({ run, sent, onShow }: { run: BatchSummary; sent: Run | null;
         <li>{run.labels.VIOLATING} violating · {run.labels.NEEDS_REVIEW} review · {run.labels.ALLOWED} allowed</li>
         <li>{run.without_claude} decided without Claude (cleared by Jev, or held as an injection)</li>
         {run.dataset && (
-          <li>Caught {run.dataset.caught} of {run.dataset.fraud} fraud · {run.dataset.false_alarms} false alarms</li>
+          <li>
+            Dataset: of {run.dataset.fraud} fraud, flagged {run.dataset.caught}; of {run.labeled - run.dataset.fraud}{" "}
+            legitimate, wrongly flagged {run.dataset.false_alarms}
+          </li>
         )}
         <li>{dollars(run.cost_usd)} · typical {seconds(run.latency_ms.p50)}, slowest {seconds(run.latency_ms.p95)}</li>
       </ul>

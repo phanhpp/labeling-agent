@@ -12,6 +12,7 @@ import random
 
 import httpx
 
+from app.auth import demo_token
 from app.dataset import CSV_PATH, read_rows
 from scripts.load_data import SPLITS
 
@@ -36,6 +37,11 @@ def main() -> None:
     parser.add_argument("--limit", type=int, help="a seeded random sample of this many")
     parser.add_argument("--url", default="http://localhost:8000")
     parser.add_argument("--token", default="demo-marketplace")
+    parser.add_argument(
+        "--dataset-labels",
+        action="store_true",
+        help="then save the dataset's answer for them, for the UI's Compare with dataset (demo mode)",
+    )
     args = parser.parse_args()
 
     items = postings(args.split, args.limit)
@@ -53,6 +59,11 @@ def main() -> None:
             for item in out["items"]:
                 if item["status"] == "rejected":
                     print(f"  rejected item {item['index']}: {item['reason']} {item.get('details', '')}")
+    if args.dataset_labels:
+        editor = {"Authorization": f"Bearer {demo_token('editor')}"}
+        out = httpx.post(f"{args.url}/demo/dataset-labels", headers=editor, timeout=60)
+        out.raise_for_status()
+        print(f"dataset labels saved for {out.json()['recorded']} postings")
 
 
 if __name__ == "__main__":

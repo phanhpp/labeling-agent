@@ -342,7 +342,8 @@ WITH current AS (
     ORDER BY posting_id, created_at DESC
 )
 SELECT l.id, l.posting_id, p.job_id, p.client_id, p.raw->>'title' AS title, l.label, l.sections,
-       l.confidence, l.rationale, l.reason_codes, l.policy_version, l.created_at, d.label AS decision
+       l.confidence, l.rationale, l.reason_codes, l.policy_version, l.created_at, l.findings,
+       d.label AS decision
 FROM current l
 JOIN postings p ON p.id = l.posting_id
 LEFT JOIN LATERAL (
@@ -381,6 +382,9 @@ async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset
             params,
         )
     ).fetchall()
+    for row in rows:
+        row["policy_match"] = policy_match(row.pop("findings"))
+        row["evidence_preview"] = evidence_preview(row["policy_match"])
     return {
         "items": rows,
         "total": total["n"],
@@ -389,6 +393,29 @@ async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset
             "section": {r["section"]: r["n"] for r in by_section},
         },
     }
+
+
+def policy_match(findings: list[dict]) -> list[dict]:
+    """The sections a label rests on (matched first, then unsure), with their evidence, for the list."""
+    keep = [f for f in findings if f["status"] == "matched"] + [
+        f for f in findings if f["status"] == "unsure"
+    ]
+    return [
+        {k: f.get(k, []) for k in ("section", "status", "quotes", "missing_fields", "reasoning")}
+        for f in keep
+    ]
+
+
+def evidence_preview(match: list[dict]) -> dict | None:
+    """One line of evidence for the list: the first quote of the first section the label rests on, or
+    the empty fields it rests on when it has no quote."""
+    for finding in match:
+        if finding["quotes"]:
+            return {"section": finding["section"], "text": finding["quotes"][0]["text"]}
+    for finding in match:
+        if finding["missing_fields"]:
+            return {"section": finding["section"], "missing": finding["missing_fields"]}
+    return None
 
 
 async def label_detail(conn: AsyncConnection, label_id: int) -> dict | None:
@@ -412,8 +439,11 @@ async def label_detail(conn: AsyncConnection, label_id: int) -> dict | None:
         )
     ).fetchall()
     job = await latest_job(conn, label["posting_id"])
+    # Exactly what the marketplace gets for this posting now (the read rule), shown on the page.
+    api_answer = await read_label(conn, post["client_id"], post["job_id"])
     return {
         **output_of(label),
+        "api_answer": as_json_safe(api_answer),
         "id": label["id"],
         "posting_id": label["posting_id"],
         "job_id": post["job_id"],
@@ -441,3 +471,8 @@ async def latest_job(conn: AsyncConnection, posting_id: int) -> dict | None:
 
 def as_json(value) -> str:
     return json.dumps(value, default=str)
+
+
+def as_json_safe(value):
+    """The value as plain JSON types (dates become text), as the API would send it."""
+    return json.loads(as_json(value))

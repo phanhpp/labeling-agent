@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFilters, toParams, toggle } from "./filters";
+import { pageWindow, readFilters, toParams, toggle } from "./filters";
 import { segments, spansFor } from "./highlight";
 import { durations, summary } from "./steps";
 
@@ -10,7 +10,7 @@ describe("highlight segments", () => {
     const out = segments(text, [{ field: "d", start: 8, end: 32, section: "§1" }]);
     expect(out).toEqual([
       { text: "Pay the " },
-      { text: "registration fee of $120", section: "§1" },
+      { text: "registration fee of $120", section: "§1", start: 8 },
       { text: " before your first shift." },
     ]);
     expect(out.map((s) => s.text).join("")).toBe(text);
@@ -23,9 +23,9 @@ describe("highlight segments", () => {
       { field: "d", start: 4, end: 20, section: "§5" },
     ]);
     expect(out.map((s) => s.text).join("")).toBe(text);
-    expect(out[0]).toEqual({ text: "Pay the regi", section: "§1" });
-    expect(out[1]).toEqual({ text: "stration", section: "§5" });
-    expect(out.at(-1)).toEqual({ text: "before your first shift.", section: "§2" });
+    expect(out[0]).toEqual({ text: "Pay the regi", section: "§1", start: 0 });
+    expect(out[1]).toEqual({ text: "stration", section: "§5", start: 4 });
+    expect(out.at(-1)).toEqual({ text: "before your first shift.", section: "§2", start: 33 });
   });
 
   it("leaves markup as text: segments are strings, never HTML", () => {
@@ -69,7 +69,7 @@ describe("step lines", () => {
     expect(summary({ node: "screen", status: "done", started_at: at(0), output: { screen: { injection_flag: true } } }))
       .toBe("suspected injection: held for review");
     expect(summary({ node: "screen", status: "done", started_at: at(0), output: { screen: { used: "jev", cleared: true, scores: { "§1": 0.05, "§5": 0.12 } } } }))
-      .toBe("jev: cleared, highest §5 0.12");
+      .toBe("Jev: every section low, Claude not needed (highest §5 at 0.12)");
     expect(summary({ node: "check", status: "done", started_at: at(0), output: { checked: { findings: [
       { section: "§1", status: "matched", dropped_quotes: ["x"] }, { section: "§2", status: "not_matched" }] } } }))
       .toBe("matched §1, 1 quotes dropped");
@@ -80,5 +80,23 @@ describe("step lines", () => {
   it("times each step until the next one started", () => {
     const steps = [0, 2, 7].map((s, i) => ({ node: `n${i}`, status: "done", started_at: at(s), output: {} }));
     expect(durations(steps)).toEqual([2000, 5000, null]);
+  });
+});
+
+describe("paging", () => {
+  it("reads the page and the page size from the URL, ignoring bad values", () => {
+    expect(readFilters(new URLSearchParams("page=3&per=50"))).toEqual({ page: 3, per: 50 });
+    expect(readFilters(new URLSearchParams("page=0&per=7"))).toEqual({});
+    expect(readFilters(new URLSearchParams("per=10"))).toEqual({ per: 10 });
+    expect(readFilters(new URLSearchParams("page=1&per=25"))).toEqual({}); // the defaults stay out of the URL
+  });
+
+  it("turns a page into the API's limit and offset", () => {
+    expect(pageWindow({})).toEqual({ limit: 25, offset: 0 });
+    expect(pageWindow({ page: 3, per: 50 })).toEqual({ limit: 50, offset: 100 });
+  });
+
+  it("goes back to the first page when a filter changes", () => {
+    expect(toggle({ page: 4 }, "label", "ALLOWED")).toEqual({ label: "ALLOWED" });
   });
 });

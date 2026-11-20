@@ -12,19 +12,21 @@ export function summary(step: Step): string {
       return parts.join(", ");
     }
     case "cache":
-      return o.decision ? "reused a stored label" : "no stored label for this input";
+      return o.decision ? "the same posting was labeled before: label reused" : "not labeled before";
     case "screen": {
       const s = o.screen ?? {};
       if (s.injection_flag) return "suspected injection: held for review";
       if (s.used === "none") return (s.reason_codes ?? []).includes("screen_unavailable") ? "screen unavailable" : "no screen";
       const top = Object.entries(s.scores ?? {}).sort((a: any, b: any) => b[1] - a[1])[0];
-      const verdict = s.cleared ? "cleared" : "sent to the model";
-      return `${s.used}: ${verdict}${top ? `, highest ${top[0]} ${Number(top[1]).toFixed(2)}` : ""}`;
+      const who = s.used === "jev" ? "Jev" : "Haiku";
+      const high = top ? ` (highest ${top[0]} at ${Number(top[1]).toFixed(2)})` : "";
+      return s.cleared ? `${who}: every section low, Claude not needed${high}` : `${who}: not clear enough to skip Claude${high}`;
     }
     case "escalate": {
       const u = (o.usage ?? [])[0];
       if (o.failure) return `failed: ${o.failure}`;
-      return u ? `${u.model}, $${Number(u.cost_usd ?? 0).toFixed(4)}` : "model answered";
+      const name = String(u?.model ?? "").includes("sonnet") ? "Claude Sonnet 5.5" : String(u?.model ?? "").includes("haiku") ? "Claude Haiku 5.5" : u?.model;
+      return u ? `${name} answered, $${Number(u.cost_usd ?? 0).toFixed(4)}` : "the model answered";
     }
     case "check": {
       const findings: any[] = o.checked?.findings ?? [];

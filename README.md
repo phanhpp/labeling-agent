@@ -34,7 +34,8 @@ open http://localhost:8000
 
 - **Without keys** it still starts: postings are accepted and wait in a queue, and the page says labeling is off.
 - **To try it with no keys and no cost:** `make up-fake seed`. A fake model labels by simple word rules, and `seed` adds 14 sample postings, an analyst decision and a draft policy.
-- **To start clean:** `make down` (deletes the database).
+- **To stop:** `make down`. Your data is kept for next time.
+- **To reset the demo:** `make reset` deletes the local demo database (the Docker volume on your machine), so the next `make up` starts empty. The demo scripts need this.
 
 ### Running the parts separately (development)
 
@@ -83,13 +84,18 @@ worker       takes the job and runs these steps:
 
 The dataset (17,880 postings, about 5% fraud) comes with a fixed test set of 400 postings chosen by the assignment, 100 of them fraud. Those 400 are kept apart: nothing was tuned on them. The final results on them are in [RESULTS.md](RESULTS.md).
 
-All tuning used 300 other postings (75 fraud). On those, with Jev screening and Claude labeling:
+All tuning used 300 other postings: 75 fraud, 225 legitimate. This is where they ended up, with Jev screening and Claude labeling:
 
-- **No legitimate posting was labeled VIOLATING.**
-- **36 of the 75 fraud postings were caught**: 5 labeled VIOLATING, the rest sent to review. The other 39 were ALLOWED. Most fraud in this dataset doesn't do anything the policy describes (no fees, no requests for bank details), so the policy itself lets it through.
-- **22% of all postings went to review**, mostly for §5: the employer can't be identified.
-- **Cost: $3.26 per 1,000 postings.** Half the postings are cleared by Jev in about 0.3 s without calling Claude, which halves the cost (Claude on every posting: $7.36). A posting that does go to Claude takes about 5 s.
-- **96% of Claude's quotes were found in the posting.** The other 4% were thrown away, never used as evidence.
+| | Labeled VIOLATING | Sent to an analyst | Labeled ALLOWED |
+| --- | --- | --- | --- |
+| 75 fraud postings | 5 | 31 | 39 |
+| 225 legitimate postings | 0 | 35 | 190 |
+
+- **No legitimate posting is labeled VIOLATING.** When the system says VIOLATING, it can show the sentence that breaks the policy.
+- **Analysts check 66 of the 300 postings (22%).** Most are there because the posting has no company profile, so the employer can't be identified (§5). About half of them are fraud.
+- **39 fraud postings are labeled ALLOWED**, because nothing in their text breaks the policy: no fee, no request for bank details, no unrealistic pay. They read like ordinary job ads. Catching them takes a new policy section; v2's §6 is a first step (see "Changing the policy").
+- **Cost: about a third of a cent per posting** ($3.26 per 1,000). Jev clears about half the postings in 0.3 s, almost for free. The rest go to Claude, which takes about 5 s and costs about $0.007 each. Sending every posting to Claude would cost $7.36 per 1,000.
+- **Every piece of evidence shown is a real quote.** Claude quoted 130 sentences as evidence; 125 were found word for word in the posting. The other 5 couldn't be found word for word, so they were discarded and never shown.
 
 ## How the two thresholds were chosen
 

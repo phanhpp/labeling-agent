@@ -1,6 +1,6 @@
 # Short names for the commands in the README. Each line is the plain command; nothing is hidden.
 
-.PHONY: up up-fake demo demo-draft seed down reset api worker web test e2e lint eval-dev demo-versions
+.PHONY: up up-fake demo demo-draft seed down reset api worker web test e2e lint eval-dev results demo-versions
 
 up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 	docker compose up -d --build --wait
@@ -51,6 +51,10 @@ lint:
 
 eval-dev:      ## real models on 50 development postings (about $0.20)
 	uv run python -m eval.run_eval --split dev --limit 50 --config jev_sonnet
+
+results:       ## write RESULTS.md from the committed eval runs (needs the dataset CSV); --check is the CI-style test
+	uv run python -m eval.report
+	uv run python -m eval.report --check
 
 demo-versions: ## the policy v2 to v4 demo with real models (needs a fresh stack with keys, about $1)
 	uv run python -m scripts.demo_versions --limit 100

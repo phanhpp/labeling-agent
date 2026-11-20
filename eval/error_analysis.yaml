@@ -1,0 +1,108 @@
+# Misclassified postings from the frozen 400 (run eval400-jev_sonnet-v1, unless the run says v2),
+# read by hand after the run. Written once, after the freeze: nothing here fed back into prompts,
+# examples or thresholds. eval/report.py puts them in RESULTS.md.
+#
+# category is one of:
+#   cleared_by_screen   fraud the Jev screen scored low on every section, so Claude never read it
+#   policy_silent       fraud that does nothing the policy describes
+#   copied_employer     a real company's text pasted in (what v2's §6 adds)
+#   empty_profile       legitimate, but the employer can't be identified, which §5 sends to review
+#   injection_edge      legitimate, held as an injection by a score just over the threshold
+#   debatable_gold      the dataset's label is arguable; ours follows the policy
+
+- id: "2137"
+  run: v1
+  gold: fraud
+  label: ALLOWED
+  category: copied_employer
+  note: >-
+    An "Electrical Technician III" ad that opens with Aker Solutions' real corporate overview, with a
+    logo and a full profile. Jev's highest score was 0.05, so it was cleared without Claude. v2's §6
+    needs the logo to be missing, so v2 misses it too. Its company profile is on 31 rows of the
+    dataset, all fraud: a check of the employer's other postings would catch it.
+
+- id: "3056"
+  run: v1
+  gold: fraud
+  label: ALLOWED
+  category: copied_employer
+  note: >-
+    Puget Sound Energy's job text pasted in, with no logo and no profile. v1 has no section for it and
+    Jev cleared it (0.07). v2's §6 (impersonated employer) matches it: NEEDS_REVIEW. This is the kind
+    of miss a policy change fixes without code.
+
+- id: "2274"
+  run: v1
+  gold: fraud
+  label: ALLOWED
+  category: cleared_by_screen
+  note: >-
+    "Customer Service Representative", work from home, salary 30,000 to 50,000, logo and a long
+    profile. Nothing asks for money or data, and the pay is plausible. Jev's highest score was 0.10,
+    under the 0.17 cut-off, so Claude never read it. Its profile is on 12 rows of the dataset, all
+    fraud: the fraud is in who posted it, not in what the ad says.
+
+- id: "662"
+  run: v1
+  gold: fraud
+  label: ALLOWED
+  category: policy_silent
+  note: >-
+    "Director of Strategy" at a fast-growing SaaS company: detailed, well written, logo and a long
+    profile. Claude read it and found nothing the policy names. Its profile is on 35 rows of the
+    dataset, all fraud: account-level fraud, which a policy about one posting can't see.
+    Under v2 Claude marked §5 unsure (review), a different answer to the same text, not the change.
+
+- id: "3612"
+  run: v1
+  gold: fraud
+  label: ALLOWED
+  category: policy_silent
+  note: >-
+    "Account Sales Managers $80-$130,000/yr", commission-based, for a no-credit-check finance firm.
+    The policy's edge case says a commission-only role is ALLOWED when the pay is stated plainly, and
+    it is. Following the policy gives ALLOWED; the dataset says fraud (its profile is on 20 rows, all
+    fraud).
+
+- id: "434"
+  run: v1
+  gold: legit
+  label: NEEDS_REVIEW
+  category: empty_profile
+  note: >-
+    A three-line contract ad ("Scrum Master, 4 months, Norwalk CT") with no profile, no logo and no
+    employer name. §5 (unverifiable employer) can't be ruled out, so it goes to review. 44 of the 45
+    false alarms under v1 are §5 like this one: short, legitimate agency ads that name no company.
+
+- id: "569"
+  run: v1
+  gold: legit
+  label: NEEDS_REVIEW
+  category: debatable_gold
+  note: >-
+    "English Teacher Abroad": "Play with kids, get paid for it ... Excellent for student loans/credit
+    cards", a 53-character profile and a personal name with links. §5 matched (review). The dataset
+    marks it legitimate; an analyst would still want to look. The same ad appears twice in the 400
+    (177), both held for review.
+
+- id: "10628"
+  run: v1
+  gold: legit
+  label: NEEDS_REVIEW
+  category: injection_edge
+  note: >-
+    An ordinary "Web Developer (AngularJS)" ad. Jev's injection score was 0.51, just over the 0.5
+    threshold, so it was held as an injection and no model labeled it. In the v2 run Jev scored it
+    under 0.5 and it was ALLOWED. The threshold was fitted to flag at most 0.1% of ordinary postings;
+    here 1 of 300 (0.3%). The cost of a false hold is one analyst look, not a wrong label.
+
+- id: "3174"
+  run: v2
+  gold: legit
+  label: VIOLATING
+  category: debatable_gold
+  note: >-
+    "Self Employed - Work from Home": a business opportunity for "anyone over 18" that requires capital
+    investment, with income hype and a profile that names no business. Under v2 Claude matched §1
+    (payment to take part) and §5, so it is VIOLATING: the only legitimate posting labeled VIOLATING
+    in either run. The policy reading is defensible; the dataset says legitimate.

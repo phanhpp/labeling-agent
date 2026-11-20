@@ -1,6 +1,6 @@
 # Policy labeling agent
 
-Reads a job posting and decides whether it breaks a fraud policy. For each posting it gives one of three labels, the policy sections behind it, and the exact sentences from the posting that show it:
+Reads a job posting and decides whether it breaks a fraud policy. For each posting it gives one of three labels, the policy sections behind it, and the exact sentences from the posting that show it. For example:
 
 ```json
 {
@@ -114,16 +114,16 @@ A new policy version goes through the UI or the API, with no code change:
 `make demo-versions` runs three versions with Claude on 100 postings:
 
 ```
-v2   adds §6: a company's text copied, with no profile or logo      13 labels change   $0.41
-v3   §5 relaxed: an empty profile is fine when the logo is shown      8 labels change   $0.42
-v4   §4 (unrealistic pay) goes to review instead of VIOLATING         1 label changes   $0.00
+v2   adds §6: a company's text copied, with no profile or logo      13 results change   $0.41
+v3   §5 relaxed: an empty profile is fine when the logo is shown      8 results change   $0.42
+v4   §4 (unrealistic pay) goes to review instead of VIOLATING         1 result changes    $0.00
 ```
 
-v4 costs nothing: only what the label does with §4 changed, not what Claude is asked, so the stored answers are simply decided again in code. Asking Claude twice doesn't always give the same answer, so the Test report marks which changes come from the policy edit (7 of 13 for v2) and which are Claude answering differently.
+v4 costs nothing: only what the label does with §4 changed, not what Claude is asked, so the stored answers are simply decided again in code. Asking Claude twice doesn't always give the same answer, so the Test report marks which changes (label or sections) come from the policy edit (7 of 13 for v2) and which are Claude answering differently.
 
 ## Safety checks
 
-- **API:** every field is checked, oversized requests are refused, each client sees only its own postings, every page and endpoint needs the right role (a test checks them all), and logs never contain posting text.
+- **API:** every field is checked, oversized requests are refused, each client sees only its own postings, every endpoint needs the right role (a test checks them all), and logs never contain posting text.
 - **Model:** hidden text is removed before any model reads the posting; the posting is marked as data, not instructions; suspected injections never reach Claude; Claude has no tools; quotes are checked; code sets the label.
 - **UI:** postings are shown as plain text, so HTML inside a posting never runs. Published policies can't be edited.
 - **Known gap:** an injection worded unlike anything tested could score under 0.5 and be cleared. If Jev and its backup both fail, Claude reads postings that only the phrase check has seen.

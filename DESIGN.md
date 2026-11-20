@@ -135,7 +135,7 @@ Quality is checked at three points: before a change ships, on every post, and af
 
 - **Deterministic code checks** on every trace, so a failure that slips through still shows up.
 - **LLM judges** on a small sample (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
-- **Human annotation and calibration:** analysts label two samples: a random 1% of the posts Jev cleared without Claude (the only way to find fraud Jev let through) and the posts the LLM judges scored low. Their labels calibrate both: Jev's labeling cut-off and injection confidence threshold, first tuned on labeled development data, are re-tuned when they show misses or the policy changes, and each judge's pass line is set where it agrees with the analysts.
+- **Human annotation and calibration:** special cases go to an annotation queue in LangSmith for a person to label: a random sample of posts Jev cleared without Claude, and traces the LLM judges scored low. These labels calibrate Jev's labeling cut-off and injection confidence threshold (first tuned on labeled development data) and each LLM judge's pass line.
 - **Analyst corrections:** when an analyst changes the final label, we review the case to see whether the policy is missing something or it's the agent's performance issue.
 - **Drift:** daily per policy version: label rates, how much Jev clears, injection flags.
 

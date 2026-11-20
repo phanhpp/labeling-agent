@@ -18,13 +18,13 @@ export default function Version() {
   return (
     <div className="page narrow">
       <div className="crumb"><Link to="/versions">Versions</Link> / <span className="mono">{data.name}</span></div>
-      <h2>
-        {data.name} <span className={`status ${data.status}`}>{data.status}</span>
-      </h2>
+      <h1 className="page-title">
+        Policy {data.name} <span className={`status ${data.status}`}>{data.status}</span>
+      </h1>
       <p className="muted">
-        From {data.parent ?? "the start"} · author {data.author}
+        {data.parent ? `Made from ${data.parent}` : "The first version"} · {who(data.author, "written")}
         {data.edited_by.length > 0 && <> · edited by {data.edited_by.join(", ")}</>}
-        {data.published_by && <> · published by {data.published_by}</>}
+        {data.published_by && <> · {who(data.published_by, "published")}</>}
       </p>
       {message && <p className="message" role="status">{message}</p>}
       {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={reload} />}
@@ -34,6 +34,9 @@ export default function Version() {
     </div>
   );
 }
+
+// "bootstrap" is the app loading policies/v1.yaml at startup, not a person.
+const who = (name: string, did: string) => (name === "bootstrap" ? `${did === "written" ? "loaded" : "published"} at startup` : `${did} by ${name}`);
 
 // The three steps of a draft, and which are done.
 function DraftGuide({ policy }: { policy: Policy }) {
@@ -113,7 +116,7 @@ function Changes({ policy }: { policy: Policy }) {
   const changes = policy.diff!.changes;
   return (
     <section className="card">
-      <h3>What changed from {policy.diff!.against}</h3>
+      <h2 className="card-title">What changed from {policy.diff!.against}</h2>
       {changes.length === 0 && <p className="muted small">Nothing yet.</p>}
       <ul className="changes">
         {changes.map((c) => (
@@ -153,7 +156,7 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
 
   return (
     <section className="card">
-      <h3>Test and publish</h3>
+      <h2 className="card-title">Test and publish</h2>
       <div className="buttons">
         <button onClick={() => act(() => api.startTest(policy.name), "Test started: recent postings are being labeled under this draft.")}>Test this draft</button>
         <button className="primary" onClick={() => act(() => api.publish(policy.name), "Published. Recent postings are being labeled again.")}>Publish</button>
@@ -202,31 +205,88 @@ function FlipReport({ report }: { report: Report }) {
   );
 }
 
-// A published policy, as text to read.
+// Open or close every section at once; each section can also be opened on its own.
+function useOpenAll(count: number) {
+  const [open, setOpen] = useState<boolean[]>(() => Array(count).fill(false));
+  useEffect(() => setOpen((o) => (o.length === count ? o : Array(count).fill(false))), [count]);
+  const toggleAll = (value: boolean) => setOpen(Array(count).fill(value));
+  const toggleOne = (i: number, value: boolean) => setOpen((o) => o.map((v, j) => (j === i ? value : v)));
+  return { open, toggleAll, toggleOne };
+}
+
+function OpenAllButtons({ toggleAll }: { toggleAll: (v: boolean) => void }) {
+  return (
+    <div className="buttons">
+      <button className="small" type="button" onClick={() => toggleAll(true)}>Open all sections</button>
+      <button className="small" type="button" onClick={() => toggleAll(false)}>Close all</button>
+    </div>
+  );
+}
+
+// A published policy, to read: every section opens to its full text.
 function PolicyText({ policy }: { policy: Policy }) {
   const body = policy.body;
+  const { open, toggleAll, toggleOne } = useOpenAll(body.sections.length);
   return (
     <section className="card policy-text">
-      <h3>The policy</h3>
-      <p><b>Edge cases</b></p>
+      <div className="crumb">
+        <h2 className="card-title" style={{ margin: 0 }}>The policy</h2>
+        <span className="spacer" />
+        <OpenAllButtons toggleAll={toggleAll} />
+      </div>
+      <p className="label-text">Edge cases</p>
       <ul>{body.header.edge_cases.map((e: string) => <li key={e}>{e}</li>)}</ul>
-      {body.sections.map((s: any) => (
-        <div className="sec-block" key={s.code} style={{ borderLeftColor: color(s.code) }}>
-          <h4>
+      {body.sections.map((s: any, i: number) => (
+        <details
+          key={s.code}
+          className="sec-block"
+          style={{ borderLeftColor: color(s.code) }}
+          open={open[i] ?? false}
+          onToggle={(e) => toggleOne(i, (e.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary>
             <span style={{ color: color(s.code) }}>{s.code}</span> {s.title} <LabelBadge label={s.effect} />
-          </h4>
-          <p>{s.text}</p>
-          <p className="muted">Jev's question: {s.screen.instructions}</p>
-        </div>
+          </summary>
+          <div className="body" data-testid={`section-${s.code}`}>
+            <p>{s.text}</p>
+            <p className="label-text">Jev's question</p>
+            <p>{s.screen.instructions}</p>
+            <p><b>Counts as yes:</b> {s.screen.true}</p>
+            <p><b>Counts as no:</b> {s.screen.false}</p>
+            <p className="label-text">Examples shown to Claude</p>
+            <ul>
+              {s.examples.map((ex: any, j: number) => (
+                <li key={j}><b>{ex.matches ? "Matches:" : "Doesn't match:"}</b> {ex.text}</li>
+              ))}
+            </ul>
+            {(s.red_flags ?? []).length > 0 && <p><b>Red-flag words</b> (always sent to Claude): {s.red_flags.join(", ")}</p>}
+          </div>
+        </details>
       ))}
     </section>
   );
 }
 
-// The draft as a form, one folded block per section, so editing can't produce broken YAML.
+// A text box that grows to fit its text, so nothing hides behind a scrollbar.
+function AutoText({ value, onChange, label, minRows = 2 }: { value: string; onChange: (v: string) => void; label: string; minRows?: number }) {
+  const fit = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  };
+  return (
+    <label className="block">
+      <span>{label}</span>
+      <textarea rows={minRows} value={value} ref={fit} onChange={(e) => { onChange(e.target.value); fit(e.target); }} />
+    </label>
+  );
+}
+
+// The draft as a form, one block per section, so editing can't produce broken YAML.
 function Editor({ policy, onSaved, notify }: { policy: Policy; onSaved: () => void; notify: (m: string) => void }) {
   const [body, setBody] = useState(() => structuredClone(policy.body));
   const { user } = useShared();
+  const { open, toggleAll, toggleOne } = useOpenAll(body.sections.length);
   useEffect(() => setBody(structuredClone(policy.body)), [policy]);
 
   const setSection = (i: number, update: (s: any) => void) =>
@@ -239,39 +299,55 @@ function Editor({ policy, onSaved, notify }: { policy: Policy; onSaved: () => vo
 
   return (
     <section className="card editor">
-      <h3>Edit the draft (acting as {user.name})</h3>
-      <div className="buttons"><button type="button" className="primary" onClick={save}>Save</button></div>
-      <label className="block">Edge cases (one per line)
-        <textarea rows={4} value={body.header.edge_cases.join("\n")}
-          onChange={(e) => setBody((b: any) => ({ ...b, header: { ...b.header, edge_cases: e.target.value.split("\n").filter(Boolean) } }))} />
-      </label>
+      <div className="crumb">
+        <h2 className="card-title" style={{ margin: 0 }}>Edit the draft (acting as {user.name})</h2>
+        <span className="spacer" />
+        <OpenAllButtons toggleAll={toggleAll} />
+        <button type="button" className="primary" onClick={save}>Save</button>
+      </div>
+      <AutoText label="Edge cases (one per line)" value={body.header.edge_cases.join("\n")}
+        onChange={(v) => setBody((b: any) => ({ ...b, header: { ...b.header, edge_cases: v.split("\n").filter(Boolean) } }))} />
       {body.sections.map((s: any, i: number) => (
-        <details className="section-form" key={i} style={{ borderLeftColor: color(s.code) }} open={!s.title}>
+        <details
+          className="sec-block"
+          key={i}
+          style={{ borderLeftColor: color(s.code) }}
+          open={(open[i] ?? false) || !s.title}
+          onToggle={(e) => toggleOne(i, (e.currentTarget as HTMLDetailsElement).open)}
+        >
           <summary>
-            <span style={{ color: color(s.code) }}>{s.code}</span> {s.title || "New section"} <span className="muted">· {s.effect}</span>
+            <span style={{ color: color(s.code) }}>{s.code}</span> {s.title || "New section"} <LabelBadge label={s.effect} />
           </summary>
-          <div className="row">
-            <input aria-label={`Section ${i + 1} code`} className="code" value={s.code} onChange={(e) => setSection(i, (x) => (x.code = e.target.value))} />
-            <input aria-label={`${s.code} title`} className="grow" value={s.title} onChange={(e) => setSection(i, (x) => (x.title = e.target.value))} />
-            <select aria-label={`${s.code} effect`} value={s.effect} onChange={(e) => setSection(i, (x) => (x.effect = e.target.value))}>
-              <option value="VIOLATING">VIOLATING</option>
-              <option value="NEEDS_REVIEW">NEEDS_REVIEW</option>
-            </select>
-          </div>
-          <label className="block">Text<textarea rows={3} value={s.text} onChange={(e) => setSection(i, (x) => (x.text = e.target.value))} /></label>
-          <label className="block">Jev's screen question<input value={s.screen.instructions} onChange={(e) => setSection(i, (x) => (x.screen.instructions = e.target.value))} /></label>
-          <div className="row">
-            <label className="block grow">Counts as yes<textarea rows={2} value={s.screen.true} onChange={(e) => setSection(i, (x) => (x.screen.true = e.target.value))} /></label>
-            <label className="block grow">Counts as no<textarea rows={2} value={s.screen.false} onChange={(e) => setSection(i, (x) => (x.screen.false = e.target.value))} /></label>
-          </div>
-          <div className="examples">
+          <div className="body">
+            <div className="row">
+              <label className="block"><span>Code</span>
+                <input aria-label={`Section ${i + 1} code`} className="code" value={s.code} onChange={(e) => setSection(i, (x) => (x.code = e.target.value))} />
+              </label>
+              <label className="block grow"><span>Title</span>
+                <input aria-label={`${s.code} title`} value={s.title} onChange={(e) => setSection(i, (x) => (x.title = e.target.value))} />
+              </label>
+              <label className="block"><span>If it matches</span>
+                <select aria-label={`${s.code} effect`} value={s.effect} onChange={(e) => setSection(i, (x) => (x.effect = e.target.value))}>
+                  <option value="VIOLATING">VIOLATING</option>
+                  <option value="NEEDS_REVIEW">NEEDS_REVIEW</option>
+                </select>
+              </label>
+            </div>
+            <AutoText label="Text" value={s.text} onChange={(v) => setSection(i, (x) => (x.text = v))} minRows={3} />
+            <AutoText label="Jev's question" value={s.screen.instructions} onChange={(v) => setSection(i, (x) => (x.screen.instructions = v))} />
+            <div className="row">
+              <div className="grow"><AutoText label="Counts as yes" value={s.screen.true} onChange={(v) => setSection(i, (x) => (x.screen.true = v))} /></div>
+              <div className="grow"><AutoText label="Counts as no" value={s.screen.false} onChange={(v) => setSection(i, (x) => (x.screen.false = v))} /></div>
+            </div>
             {s.examples.map((ex: any, j: number) => (
               <div className="row" key={j}>
-                <select aria-label="Example matches" value={String(ex.matches)} onChange={(e) => setSection(i, (x) => (x.examples[j].matches = e.target.value === "true"))}>
-                  <option value="true">matches</option>
-                  <option value="false">doesn't match</option>
-                </select>
-                <input className="grow" aria-label="Example text" value={ex.text} onChange={(e) => setSection(i, (x) => (x.examples[j].text = e.target.value))} />
+                <label className="block"><span>Example {j + 1}</span>
+                  <select aria-label="Example matches" value={String(ex.matches)} onChange={(e) => setSection(i, (x) => (x.examples[j].matches = e.target.value === "true"))}>
+                    <option value="true">matches</option>
+                    <option value="false">doesn't match</option>
+                  </select>
+                </label>
+                <div className="grow"><AutoText label="Example text" value={ex.text} onChange={(v) => setSection(i, (x) => (x.examples[j].text = v))} minRows={1} /></div>
               </div>
             ))}
           </div>

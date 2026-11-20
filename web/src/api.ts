@@ -1,7 +1,7 @@
 // Every call to the API. Each request carries the acting user's token; the API decides what that
 // role may do. Errors come back as ApiError with the API's code (e.g. "forbidden", "four_eyes").
 
-import { toParams, type Filters } from "./lib/filters";
+import { pageWindow, type Filters } from "./lib/filters";
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, public detail?: unknown) {
@@ -38,9 +38,12 @@ export type Finding = {
   section: string; status: string; reasoning: string; quotes: Quote[]; confidence: number;
   missing_fields: string[]; dropped_quotes: string[];
 };
+export type Match = { section: string; status: string; quotes: Quote[]; missing_fields: string[]; reasoning: string };
 export type LabelRow = {
   id: number; posting_id: number; job_id: string; title: string; label: string; sections: string[];
   confidence: number; rationale: string; reason_codes: string[]; policy_version: string; decision: string | null;
+  policy_match: Match[];
+  evidence_preview: { section: string; text?: string; missing?: string[] } | null;
 };
 export type Browse = { version: string; items: LabelRow[]; total: number; counts: { label: Record<string, number>; section: Record<string, number> } };
 export type Detail = {
@@ -51,6 +54,7 @@ export type Detail = {
   history: { id: number; policy_version: string; label: string; sections: string[]; created_at: string }[];
   decisions: { label: string; note: string; analyst: string; policy_version: string; created_at: string }[];
   job: { status: string } | null;
+  api_answer: Record<string, unknown> | null;
 };
 export type Steps = { job: { status: string; checkpoints_pruned: boolean } | null; steps: import("./lib/steps").Step[] };
 export type Version = {
@@ -68,7 +72,12 @@ export type Health = { live_labeling: boolean; missing_keys: string[]; agent_con
 
 export const api = {
   health: () => request<Health>("/health"),
-  labels: (filters: Filters) => request<Browse>(`/ui/labels?${toParams(filters)}&limit=200`),
+  labels: (filters: Filters) => {
+    const { limit, offset } = pageWindow(filters);
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    for (const key of ["label", "section", "job_id", "version"] as const) if (filters[key]) params.set(key, filters[key]!);
+    return request<Browse>(`/ui/labels?${params}`);
+  },
   label: (id: string) => request<Detail>(`/ui/labels/${id}`),
   steps: (postingId: number) => request<Steps>(`/ui/postings/${postingId}/steps`),
   decide: (id: number, label: string, note: string) => request(`/ui/labels/${id}/decision`, json("POST", { label, note })),

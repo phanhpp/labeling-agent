@@ -3,9 +3,11 @@
 
 export const LABELS = ["NEEDS_REVIEW", "VIOLATING", "ALLOWED"] as const;
 export type Label = (typeof LABELS)[number];
-export type Filters = { label?: Label; section?: string; job_id?: string; version?: string };
+export type Filters = { label?: Label; section?: string; job_id?: string; version?: string; page?: number; per?: number };
 
-const KEYS = ["label", "section", "job_id", "version"] as const;
+const KEYS = ["label", "section", "job_id", "version", "page", "per"] as const;
+export const PAGE_SIZES = [10, 25, 50, 100] as const;
+export const DEFAULT_PER = 25;
 
 export function readFilters(params: URLSearchParams): Filters {
   const out: Filters = {};
@@ -17,21 +19,33 @@ export function readFilters(params: URLSearchParams): Filters {
   if (jobId) out.job_id = jobId;
   const version = params.get("version");
   if (version) out.version = version;
+  const page = Number(params.get("page"));
+  if (Number.isInteger(page) && page > 1) out.page = page;
+  const per = Number(params.get("per"));
+  if ((PAGE_SIZES as readonly number[]).includes(per) && per !== DEFAULT_PER) out.per = per;
   return out;
+}
+
+// The API's limit and offset for the page the filters ask for.
+export function pageWindow(filters: Filters): { limit: number; offset: number } {
+  const per = filters.per ?? DEFAULT_PER;
+  return { limit: per, offset: ((filters.page ?? 1) - 1) * per };
 }
 
 export function toParams(filters: Filters): URLSearchParams {
   const params = new URLSearchParams();
   for (const key of KEYS) {
     const value = filters[key];
-    if (value) params.set(key, value);
+    if (value) params.set(key, String(value));
   }
   return params;
 }
 
 // Clicking the chip that is on turns it off; any other chip replaces it.
+// Changing a filter goes back to the first page.
 export function toggle(filters: Filters, key: "label" | "section", value: string): Filters {
   const next = { ...filters };
+  delete next.page;
   if (next[key] === value) delete next[key];
   else (next as Record<string, string>)[key] = value;
   return next;

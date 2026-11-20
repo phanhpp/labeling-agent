@@ -124,3 +124,47 @@ async def test_after_a_new_version_goes_live_the_old_label_is_returned_as_stale(
         await store.enqueue(conn, posting["id"], "v2", "h2", "backfill")
     out = (await api.get("/v1/postings/p1/label", headers=as_("marketplace"))).json()
     assert out["relabel_status"] == "queued"
+
+
+async def test_each_row_carries_its_policy_match_and_one_line_of_evidence(api, worker):
+    await _labeled(api, worker)
+    rows = {i["job_id"]: i for i in (await api.get("/ui/labels", headers=as_("viewer"))).json()["items"]}
+    fee = rows["p1"]
+    assert [m["section"] for m in fee["policy_match"]] == ["§1"]
+    assert fee["policy_match"][0]["status"] == "matched" and fee["policy_match"][0]["quotes"]
+    assert fee["evidence_preview"]["section"] == "§1"
+    assert fee["evidence_preview"]["text"] in POSTING["description"]
+    assert rows["p2"]["policy_match"] == [] and rows["p2"]["evidence_preview"] is None
+
+
+def test_evidence_preview_falls_back_to_empty_fields():
+    from app.store import evidence_preview, policy_match
+
+    findings = [
+        {"section": "§1", "status": "not_matched", "quotes": [], "missing_fields": [], "reasoning": ""},
+        {
+            "section": "§5",
+            "status": "matched",
+            "quotes": [],
+            "missing_fields": ["company_profile"],
+            "reasoning": "r",
+        },
+        {
+            "section": "§4",
+            "status": "unsure",
+            "quotes": [{"text": "x"}],
+            "missing_fields": [],
+            "reasoning": "",
+        },
+    ]
+    match = policy_match(findings)
+    assert [m["section"] for m in match] == ["§5", "§4"]  # matched first, then unsure
+    assert evidence_preview(match) == {"section": "§4", "text": "x"}  # a quote beats empty fields
+    assert evidence_preview(match[:1]) == {"section": "§5", "missing": ["company_profile"]}
+
+
+async def test_the_decision_page_gets_the_marketplace_answer(api, worker):
+    ids = await _labeled(api, worker)
+    out = (await api.get(f"/ui/labels/{ids['p1']}", headers=as_("viewer"))).json()
+    marketplace = (await api.get("/v1/postings/p1/label", headers=as_("marketplace"))).json()
+    assert out["api_answer"] == marketplace

@@ -44,6 +44,8 @@ def _summary(row: dict) -> dict:
         "content_hash": row["content_hash"],
         "model_hash": row["model_hash"],
         "tested": row["tested_hash"] == row["content_hash"],
+        "submitted_by": row.get("submitted_by"),
+        "submitted_at": row.get("submitted_at"),
         "created_at": row["created_at"],
     }
 
@@ -111,6 +113,20 @@ async def start_test(
 async def test_report(name: str, request: Request, user: User = Depends(require(*VIEW))):
     async with _conn(request) as conn:
         return await _run(versions.test_report(conn, name))
+
+
+@router.post("/drafts/{name}/test/stop")
+async def stop_test(name: str, request: Request, user: User = Depends(require(*EDIT))):
+    """Stop a running Test: postings not yet labeled are dropped."""
+    async with _conn(request) as conn:
+        return await _run(versions.stop_test(conn, name))
+
+
+@router.post("/drafts/{name}/submit")
+async def submit(name: str, request: Request, user: User = Depends(require(*EDIT))):
+    """Mark the draft ready for a publisher (needs a passing Test of its current content)."""
+    async with _conn(request) as conn:
+        return _summary(await _run(versions.submit(conn, name, user.name)))
 
 
 @router.post("/drafts/{name}/publish")

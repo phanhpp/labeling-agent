@@ -16,17 +16,22 @@ const FIELDS: [string, string][] = [
   ["salary_range", "Salary"],
 ];
 
-// A highlight's id, so the evidence list and the findings can scroll to it.
+// Ids for a highlight in the posting and for a section's row in "What the Labeling Agent found",
+// so each can take you to the other.
 const quoteId = (fieldName: string, start: number) => `q-${fieldName}-${start}`;
+const sectionId = (code: string) => `found-${code.replace("§", "s")}`;
 
-function showQuote(fieldName: string, start: number) {
-  const el = document.getElementById(quoteId(fieldName, start));
+function flashTo(id: string) {
+  const el = document.getElementById(id);
   if (!el) return;
+  if (el.closest("details") && !(el.closest("details") as HTMLDetailsElement).open) (el.closest("details") as HTMLDetailsElement).open = true;
   el.scrollIntoView({ behavior: "smooth", block: "center" });
   el.classList.remove("flash");
   void el.offsetWidth; // restart the animation
   el.classList.add("flash");
 }
+const showQuote = (fieldName: string, start: number) => flashTo(quoteId(fieldName, start));
+const showSection = (code: string) => flashTo(sectionId(code));
 
 export default function Decision() {
   const { id = "" } = useParams();
@@ -38,9 +43,8 @@ export default function Decision() {
       <ListNav label={data} />
       <div className="decision">
         <main>
-          <Evidence label={data} />
           <Posting label={data} />
-          <Findings label={data} />
+          <Found label={data} />
           <Timeline postingId={data.posting_id} />
           <History label={data} />
           <ApiAnswer label={data} />
@@ -69,46 +73,6 @@ function ListNav({ label }: { label: Detail }) {
   );
 }
 
-// The evidence the label rests on, as the API returns it: each verified quote with its section and
-// where it is; clicking one shows it in the posting. Empty fields and discarded quotes are listed too.
-function Evidence({ label }: { label: Detail }) {
-  const { sections } = useShared();
-  const quotes = label.findings.flatMap((f) => (f.status === "not_matched" ? [] : f.quotes.map((q) => ({ ...q, section: f.section, status: f.status }))));
-  const missing = label.findings.flatMap((f) => (f.status === "not_matched" ? [] : f.missing_fields.map((m) => ({ section: f.section, field: m }))));
-  const dropped = label.findings.flatMap((f) => f.dropped_quotes);
-  return (
-    <section className="card" data-testid="evidence">
-      <h2 className="card-title">Evidence</h2>
-      {quotes.length === 0 && missing.length === 0 && (
-        <p className="muted small">{label.label === "ALLOWED" ? "No section of the policy matched, so there is no evidence to show." : "No quote: see the reasons on the right."}</p>
-      )}
-      <ul className="evidence-list">
-        {quotes.map((q) => (
-          <li key={`${q.field}-${q.start}`}>
-            <SectionTag code={q.section} title={sections[q.section]} />
-            <button className="quote" style={{ borderLeftColor: color(q.section) }} onClick={() => showQuote(q.field, q.start)} title="Show it in the posting">
-              “{q.text}”
-              <span className="where">{field(q.field)}{q.status === "unsure" ? " · the section is unsure" : ""} · show in the posting</span>
-            </button>
-          </li>
-        ))}
-        {missing.map((m) => (
-          <li key={`${m.section}-${m.field}`}>
-            <SectionTag code={m.section} title={sections[m.section]} />
-            <span>The {field(m.field)} is empty.</span>
-          </li>
-        ))}
-      </ul>
-      {dropped.length > 0 && (
-        <p className="hint">
-          {dropped.length === 1 ? "1 quote was" : `${dropped.length} quotes were`} discarded because {dropped.length === 1 ? "it isn't" : "they aren't"} in the posting word for word:{" "}
-          {dropped.map((d) => `“${d}”`).join(", ")}.
-        </p>
-      )}
-    </section>
-  );
-}
-
 // The posting as the models saw it (cleaned), as plain text. Verified quotes are highlighted from
 // their stored positions, in their section's colour. React renders text, never HTML.
 function Posting({ label }: { label: Detail }) {
@@ -132,6 +96,11 @@ function Posting({ label }: { label: Detail }) {
                     id={seg.start !== undefined ? quoteId(name, seg.start) : undefined}
                     data-section={seg.section}
                     style={{ "--c": color(seg.section) } as React.CSSProperties}
+                    role="button"
+                    tabIndex={0}
+                    title={`Show what the agent found for ${seg.section}`}
+                    onClick={() => showSection(seg.section!)}
+                    onKeyDown={(e) => { if (e.key === "Enter") showSection(seg.section!); }}
                   >
                     {seg.text}
                     <sup>{seg.section}</sup>
@@ -153,7 +122,7 @@ function Posting({ label }: { label: Detail }) {
 function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void }) {
   const { user, sections } = useShared();
   const decision = label.decisions[0];
-  const why = reasonSentence(label.reason_codes.filter((r) => r !== "review_section_matched" || label.label !== "VIOLATING"));
+  const why = shortWhy(label);
   return (
     <section className="card">
       <h2 className="card-title">Label</h2>
@@ -162,8 +131,12 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
         {label.policy_sections.map((s) => <SectionTag key={s} code={s} title={sections[s]} />)}
       </div>
       <p className="rationale">{label.rationale}</p>
-      {why && <p className="hint">{why}</p>}
-      <p className="hint">{confidenceText(label)}</p>
+      <p className="hint" data-testid="why">
+        {why}
+        {label.confidence > 0 && (
+          <> · <span className="has-tip" title={confidenceTip(label)}>Confidence {label.confidence.toFixed(2)}</span></>
+        )}
+      </p>
       {decision && (
         <div className="final" data-testid="analyst-decision">
           <b>Analyst decision: {decision.label.replace("_", " ").toLowerCase()}</b> (final) · {decision.analyst}
@@ -179,12 +152,25 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
   );
 }
 
-// Where the confidence number comes from, in words.
-function confidenceText(label: Detail): string {
-  const c = label.confidence.toFixed(2);
-  if (label.reason_codes.includes("cleared_by_screen")) return `Confidence ${c}: one minus Jev's highest section score.`;
-  if (label.confidence === 0) return "Confidence 0: no model judged this posting, so a person should.";
-  return `Confidence ${c}: how sure Claude said it was about the section the label rests on (its own estimate, 0 to 1).`;
+// Why the label is what it is, in one short line, from the findings.
+function shortWhy(label: Detail): string {
+  const codes = label.reason_codes;
+  if (codes.includes("injection")) return "It tries to instruct an AI, so no model labeled it";
+  if (codes.includes("dlq")) return "Labeling failed 3 times, so a person should look";
+  const failure = codes.find((c) => ["llm_refusal", "llm_output_invalid", "clean_error"].includes(c));
+  if (failure) return reasonSentence([failure]).replace(/\.$/, "");
+  if (codes.includes("cleared_by_screen")) return "Jev scored every section low";
+  const matched = label.findings.filter((f) => f.status === "matched").map((f) => f.section);
+  const unsure = label.findings.filter((f) => f.status === "unsure").map((f) => f.section);
+  if (label.label === "VIOLATING") return `Violates ${matched.join(", ")}`;
+  const parts = [matched.length ? `${matched.join(", ")} matched` : "", unsure.length ? `${unsure.join(", ")} unsure` : ""].filter(Boolean);
+  return parts.length ? parts.join(", ") : "No section matched";
+}
+
+// Where the confidence number comes from, shown on hover.
+function confidenceTip(label: Detail): string {
+  if (label.reason_codes.includes("cleared_by_screen")) return "One minus Jev's highest section score.";
+  return "How sure Claude said it was about the section the label rests on: its own estimate, from 0 to 1.";
 }
 
 function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => void }) {
@@ -202,7 +188,7 @@ function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => 
         );
       }}
     >
-      <span className="label-text">Your decision: final, and what the marketplace sees</span>
+      <span className="label-text">Your decision: final outcome</span>
       <select aria-label="Your decision" value={choice} onChange={(e) => setChoice(e.target.value)}>
         <option value="VIOLATING">Violating</option>
         <option value="NEEDS_REVIEW">Needs review</option>
@@ -215,31 +201,62 @@ function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => 
   );
 }
 
-function Findings({ label }: { label: Detail }) {
+// What the agent found, section by section: the sections the label rests on first, each with its
+// reasoning, its quotes (click one to see it in the posting), the empty fields it rests on and any
+// quotes it gave that weren't in the posting. Sections that didn't match fold into one line.
+function Found({ label }: { label: Detail }) {
   const { sections } = useShared();
   const scores: Record<string, number> = label.screen?.scores ?? {};
+  const order = { matched: 0, unsure: 1, not_matched: 2 } as Record<string, number>;
+  const findings = [...label.findings].sort((a, b) => order[a.status] - order[b.status]);
+  const relevant = findings.filter((f) => f.status !== "not_matched");
+  const others = findings.filter((f) => f.status === "not_matched");
+
+  const row = (f: Detail["findings"][number]) => (
+    <div className={`finding ${f.status}`} key={f.section} id={sectionId(f.section)}>
+      <span className="code" style={{ color: color(f.section) }}>{f.section}</span>
+      <span className="name">{sections[f.section] ?? ""}</span>
+      <span className="st">{f.status === "not_matched" ? "not matched" : f.status}</span>
+      <span className="r">{f.reasoning}</span>
+      {f.quotes.length > 0 && (
+        <ul className="evidence-list">
+          {f.quotes.map((q) => (
+            <li key={`${q.field}-${q.start}`}>
+              <button className="quote" style={{ borderLeftColor: color(f.section) }} onClick={() => showQuote(q.field, q.start)} title="Show it in the posting">
+                “{q.text}”
+                <span className="where">{field(q.field)} · show in the posting</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {f.missing_fields.length > 0 && <span className="r">Rests on empty fields: {f.missing_fields.map(field).join(", ")}.</span>}
+      {f.dropped_quotes.length > 0 && (
+        <span className="r hint">
+          Discarded, not in the posting word for word: {f.dropped_quotes.map((d) => `“${d}”`).join(", ")}.
+        </span>
+      )}
+      <span className="nums">
+        Claude {f.confidence.toFixed(2)}
+        {scores[f.section] !== undefined && <> · Jev {Number(scores[f.section]).toFixed(2)}</>}
+      </span>
+    </div>
+  );
+
   return (
-    <section className="card">
-      <h2 className="card-title">What Claude found, section by section</h2>
+    <section className="card found" data-testid="found">
+      <h2 className="card-title">What the Labeling Agent found</h2>
       {label.findings.length === 0 && <p className="muted small">No model read this posting. See the reasons on the right.</p>}
-      {label.findings.map((f) => (
-        <div className={`finding ${f.status}`} key={f.section}>
-          <span className="code" style={{ color: color(f.section) }}>{f.section}</span>
-          <span className="name">{sections[f.section] ?? ""}</span>
-          <span className="st">{f.status.replace("_", " ")}</span>
-          <span className="r">
-            {f.reasoning}
-            {f.missing_fields.length > 0 && <> Rests on empty fields: {f.missing_fields.map(field).join(", ")}.</>}
-          </span>
-          <span className="nums">
-            Claude {f.confidence.toFixed(2)}
-            {scores[f.section] !== undefined && <> · Jev {Number(scores[f.section]).toFixed(2)}</>}
-            {f.quotes.length > 0 && (
-              <> · <button className="link" onClick={() => showQuote(f.quotes[0].field, f.quotes[0].start)}>show in the posting</button></>
-            )}
-          </span>
-        </div>
-      ))}
+      {label.findings.length > 0 && relevant.length === 0 && <p className="muted small">No section of the policy matched.</p>}
+      {relevant.map(row)}
+      {others.length > 0 && (
+        <details className="others">
+          <summary>
+            {others.length} {others.length === 1 ? "section" : "sections"} not matched: {others.map((f) => f.section).join(", ")}
+          </summary>
+          {others.map(row)}
+        </details>
+      )}
     </section>
   );
 }

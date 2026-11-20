@@ -17,6 +17,10 @@ CREATE TABLE IF NOT EXISTS policy_versions (
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- A draft an editor has submitted for publishing (cleared by any later edit).
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS submitted_by text;
+ALTER TABLE policy_versions ADD COLUMN IF NOT EXISTS submitted_at timestamptz;
+
 -- At most one live version.
 CREATE UNIQUE INDEX IF NOT EXISTS one_live_policy ON policy_versions ((true)) WHERE status = 'live';
 

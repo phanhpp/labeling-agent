@@ -55,7 +55,7 @@ test("an injection is held for review and the checks say why", async ({ page }) 
   await openJob(page, "fx-injection");
   await expect(page.locator(".verdict .badge")).toHaveText("NEEDS REVIEW");
   await expect(page.locator(".checks")).toContainText("tries to give instructions to an AI");
-  await expect(page.locator(".rail")).toContainText("seems to give instructions to an AI");
+  await expect(page.getByTestId("why")).toContainText("It tries to instruct an AI");
 });
 
 test("when the API is down the page says so", async ({ page }) => {
@@ -104,12 +104,16 @@ test("clicking a row opens the posting; back to the list keeps the filter; next 
   await expect(page).toHaveURL(/label=NEEDS_REVIEW/);
 });
 
-test("the evidence card shows the quotes and takes you to each one in the posting", async ({ page }) => {
+test("what the agent found links both ways with the highlights in the posting", async ({ page }) => {
   await openJob(page, "fx-fee");
-  const evidence = page.getByTestId("evidence");
-  await expect(evidence).toContainText("registration fee of $120");
-  await evidence.getByRole("button", { name: /registration fee/ }).click();
+  const found = page.getByTestId("found");
+  await expect(found.getByRole("heading")).toHaveText("What the Labeling Agent found");
+  await expect(found.locator(".finding.matched")).toContainText("registration fee of $120");
+  await expect(page.getByTestId("why")).toContainText("Violates §1");
+  await found.getByRole("button", { name: /registration fee/ }).click();
   await expect(page.locator('mark[data-section="§1"]').first()).toHaveClass(/flash/);
+  await page.locator('mark[data-section="§1"]').first().click(); // and back: the highlight shows its section
+  await expect(found.locator(".finding.matched")).toHaveClass(/flash/);
   await page.getByText("The API's answer (JSON)").click();
   await expect(page.getByTestId("api-answer")).toContainText('"job_id": "fx-fee"');
 });
@@ -122,27 +126,54 @@ test("a policy section opens to its full text", async ({ page }) => {
   await expect(page.getByTestId("section-§1")).toContainText("Counts as yes");
 });
 
-test("roles: a viewer can't edit, an editor can't publish, an editing publisher can't publish, another can", async ({ page }) => {
+test("roles on a draft: a viewer reads, an editor submits, an editing publisher can't publish, another can", async ({ page }) => {
   await page.goto("/versions/v2");
   await actAs(page, "viewer");
-  await page.getByRole("button", { name: "Save" }).first().click();
-  await expect(page.getByText("This user's role can't do that.")).toBeVisible();
+  await expect(page.getByText("Viewers can read drafts")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
 
   await actAs(page, "editor");
-  await page.getByRole("button", { name: "Publish" }).click();
-  await expect(page.getByText("This user's role can't do that.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0); // editors submit, not publish
+  await page.getByRole("button", { name: "Submit for publishing" }).click();
+  await expect(page.getByText("Submitted. A publisher needs to publish it.")).toBeVisible();
+  await page.goto("/versions");
+  await expect(page.locator("tr", { hasText: "v2" })).toContainText("waiting for a publisher");
 
+  await page.goto("/versions/v2");
   await actAs(page, "publisher_a");
   await page.getByRole("button", { name: "Save" }).first().click(); // Pat edits the draft
   await expect(page.getByText(/^Saved\./)).toBeVisible();
-  await page.getByRole("button", { name: "Publish" }).click();
-  await expect(page.getByText("You edited this draft, so a different publisher has to publish it.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+  await expect(page.getByTestId("publish-blocked")).toContainText("You edited this draft");
 
   await actAs(page, "publisher_b");
   await expect(page.getByTestId("flip-report")).toContainText("Test passed.");
-  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByText(/^Published\./)).toBeVisible();
   await page.goto("/versions");
-  await expect(page.locator("tr", { hasText: "v2" }).locator(".status")).toHaveText("live");
-  await expect(page.locator(".pill")).toContainText("v2");
+  await expect(page.locator("tr", { hasText: "v2" }).locator(".status").first()).toHaveText("live");
+  await expect(page.getByTestId("viewing")).toContainText("v2");
+});
+
+test("the side panel folds, shows an older version without changing what is live, and compares versions", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Fold the side panel" }).click();
+  await expect(page.getByRole("complementary", { name: "Side panel" })).toBeHidden();
+  await page.getByRole("button", { name: "Open the side panel" }).click();
+  await expect(page.getByRole("complementary", { name: "Side panel" })).toBeVisible();
+
+  await page.getByLabel("Policy shown").selectOption("v1");
+  await expect(page.getByTestId("viewing")).toContainText("Showing policy v1 · live is v2");
+  await expect(page.getByText(/labels under v1/)).toBeVisible();
+  await page.getByLabel("Policy shown").selectOption("v2");
+  await expect(page.getByTestId("viewing")).toContainText("Showing policy v2 (live)");
+
+  await page.getByRole("button", { name: "Compare v1 → v2" }).click();
+  await expect(page.getByRole("heading", { name: "How labels changed from v1 to v2" })).toBeVisible();
+  const rows = page.getByTestId("compare").locator("tbody tr");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Senior Pipeline Engineer");
+  await page.getByText("Only postings that changed").click();
+  await expect(rows).toHaveCount(14);
 });

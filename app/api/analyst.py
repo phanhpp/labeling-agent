@@ -5,7 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from app import store
+from app import store, versions
 from app.auth import EDIT, VIEW, User, require
 
 router = APIRouter(prefix="/ui", tags=["analyst"])
@@ -36,6 +36,21 @@ async def browse(
         filters = {"version": version, "label": label, "section": section, "reason": reason, "job_id": job_id}
         result = await store.browse_labels(conn, filters, limit, offset)
     return {"version": version, **result}
+
+
+@router.get("/compare")
+async def compare(
+    request: Request,
+    old: str = Query(..., alias="from"),
+    new: str = Query(..., alias="to"),
+    user: User = Depends(require(*VIEW)),
+):
+    """Each posting's label under two versions, side by side, and what changed."""
+    async with _conn(request) as conn:
+        try:
+            return await versions.compare(conn, old, new)
+        except versions.Refused as refused:
+            raise HTTPException(refused.status, refused.code) from refused
 
 
 @router.get("/labels/{label_id}")

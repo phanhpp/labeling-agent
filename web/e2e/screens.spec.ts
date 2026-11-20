@@ -12,7 +12,7 @@ for (const [name, width, height] of [["desktop", 1440, 900], ["phone", 390, 844]
     await page.getByTestId("steps").locator("li").first().waitFor();
     await page.screenshot({ path: `test-results/screens/${name}-decision.png`, fullPage: true });
     await page.goto("/versions/v2");
-    await page.locator(".editor").waitFor();
+    await page.locator(".steps-guide").waitFor();
     await page.screenshot({ path: `test-results/screens/${name}-version.png`, fullPage: true });
   });
 }

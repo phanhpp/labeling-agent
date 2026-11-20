@@ -11,6 +11,10 @@ dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.9",
     "beautifulsoup4>=4.12",
+    "langchain-anthropic>=1.7",
+    "langgraph>=1.2",
+    "langchain-core>=1.8.4",
+    "langsmith>=0.15.1",
 ]
 
 [dependency-groups]

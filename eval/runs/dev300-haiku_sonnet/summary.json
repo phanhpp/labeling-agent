@@ -1,0 +1,106 @@
+{
+ "run": "dev300-haiku_sonnet",
+ "config": "haiku_sonnet",
+ "model_version": "haiku_sonnet;escalate=claude-sonnet-5-5;screen=haiku;agent=1;prompt=p1",
+ "source": "dev",
+ "finished_at": "2026-11-20T04:22:21.076755+00:00",
+ "postings": 300,
+ "scored": 300,
+ "errored": [],
+ "fraud_in_scored": 75,
+ "main": {
+  "tp": 37,
+  "fp": 33,
+  "fn": 38,
+  "precision": 0.5286,
+  "recall": 0.4933,
+  "f1": 0.5103,
+  "precision_at_real_rate": 0.145,
+  "ci95": {
+   "precision": [
+    0.4156,
+    0.6508
+   ],
+   "recall": [
+    0.3768,
+    0.622
+   ],
+   "f1": [
+    0.4091,
+    0.6154
+   ]
+  }
+ },
+ "strict": {
+  "tp": 5,
+  "fp": 0,
+  "fn": 70,
+  "precision": 1.0,
+  "recall": 0.0667,
+  "f1": 0.125,
+  "precision_at_real_rate": 1.0,
+  "ci95": {
+   "precision": [
+    1.0,
+    1.0
+   ],
+   "recall": [
+    0.0141,
+    0.1325
+   ],
+   "f1": [
+    0.0278,
+    0.234
+   ]
+  }
+ },
+ "confusion": {
+  "fraud": {
+   "VIOLATING": 5,
+   "NEEDS_REVIEW": 32,
+   "ALLOWED": 38
+  },
+  "legit": {
+   "VIOLATING": 0,
+   "NEEDS_REVIEW": 33,
+   "ALLOWED": 192
+  }
+ },
+ "review_load": 0.2167,
+ "review_causes": {
+  "review_section_matched": 38,
+  "section_unsure": 34
+ },
+ "cost_per_1000_usd": 4.7241,
+ "latency_ms": {
+  "p50": 5808,
+  "p95": 8536
+ },
+ "quotes": {
+  "verified": 158,
+  "dropped": 3,
+  "verified_share": 0.9814
+ },
+ "calibration": [
+  {
+   "confidence": "0.0-0.5",
+   "n": 6,
+   "correct": 0.5
+  },
+  {
+   "confidence": "0.5-0.7",
+   "n": 38,
+   "correct": 0.395
+  },
+  {
+   "confidence": "0.7-0.9",
+   "n": 111,
+   "correct": 0.667
+  },
+  {
+   "confidence": "0.9-1.0",
+   "n": 145,
+   "correct": 0.945
+  }
+ ]
+}

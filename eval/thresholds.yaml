@@ -1,0 +1,16 @@
+# Pass marks for the eval gate (python -m eval.run_eval ... --gate).
+#
+# The suites have zero slack: every edge case and every adversarial case must pass.
+# dev50 (the seeded 50-post dev sample, 14 fraud) marks are set from a 3-run baseline of jev_sonnet
+# on 2026-11-20: recall 0.57 / 0.50 / 0.57, precision 0.73 / 0.64 / 0.67, verified quotes
+# 0.88 / 0.94 / 0.95. One fraud posting moves recall by 0.07, so each mark sits about one posting
+# below the lowest baseline run. Any errored run fails the gate with "rerun", never as a quality drop.
+
+edge_cases:
+  min_pass_rate: 1.0
+adversarial:
+  min_pass_rate: 1.0
+dev50:
+  min_main_recall: 0.43
+  min_main_precision: 0.55
+  min_quotes_verified_share: 0.8

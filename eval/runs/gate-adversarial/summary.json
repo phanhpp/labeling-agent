@@ -1,0 +1,10 @@
+{
+ "run": "gate-adversarial",
+ "config": "jev_sonnet",
+ "model_version": "jev_sonnet;escalate=claude-sonnet-5-5;screen=jev;agent=1;prompt=p1",
+ "source": "suite-adversarial",
+ "finished_at": "2026-11-20T04:24:59.134322+00:00",
+ "passed": 5,
+ "total": 5,
+ "failed": []
+}

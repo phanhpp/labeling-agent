@@ -1,0 +1,84 @@
+# The eval gate: real model calls on the hand-written suites and the 50-post dev sample, scored
+# against eval/thresholds.yaml. It costs a little each run (about $0.20), so it runs only on pull
+# requests whose latest push changed what the agent does: app/agent, policies, eval or this file.
+# Not a required check: a Jev or Anthropic outage means "rerun", not "fix the code".
+# Needs repository secrets ANTHROPIC_API_KEY and TYPESAFE_API_KEY.
+
+name: Eval gate
+
+on:
+  pull_request:
+    paths:
+      - "app/agent/**"
+      - "policies/**"
+      - "eval/**"
+      - ".github/workflows/eval.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The paths filter looks at the whole pull request. This job checks what this push changed, so a
+  # later push that only edits docs doesn't pay for another eval (as in kg).
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.diff.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        shell: bash
+        env:
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          from="$BASE"
+          if [ "$ACTION" = synchronize ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then from="$BEFORE"; fi
+          files=$(git diff --name-only "$from" "$HEAD")
+          relevant=$(printf '%s\n' "$files" | grep -E '^(app/agent|policies|eval)/|^\.github/workflows/eval\.yml$' | grep -v '\.md$' || true)
+          echo "Changed files the eval measures:"; echo "${relevant:-(none)}"
+          echo "relevant=$([ -n "$relevant" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  eval:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+      LANGSMITH_TRACING: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run python -m scripts.load_data
+      # Every suite runs even after one fails, so the summary shows all of them; the job fails at the end.
+      - name: Suites and the dev sample, each with its gate
+        shell: bash
+        run: |
+          set -o pipefail
+          failed=0
+          for suite in edge_cases adversarial; do
+            uv run python -m eval.run_eval --suite "$suite" --config jev_sonnet --gate --name "ci-$suite" | tee -a out.txt || failed=1
+          done
+          uv run python -m eval.run_eval --split dev --limit 50 --config jev_sonnet --gate --name ci-dev50 | tee -a out.txt || failed=1
+          { echo "## Eval gate"; echo '```'; grep -E "GATE|passed|recall|precision" out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$failed"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-gate-runs
+          path: eval/runs/ci-*
+          retention-days: 30

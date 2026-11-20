@@ -17,6 +17,8 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
+
 from app import config as settings
 from app import policy as policies
 from app.agent.configs import CONFIGS
@@ -29,6 +31,31 @@ from scripts.load_data import SPLITS
 EVAL_DIR = Path(__file__).resolve().parent
 RUNS = EVAL_DIR / "runs"
 SUITES = EVAL_DIR / "suites"
+THRESHOLDS = EVAL_DIR / "thresholds.yaml"
+
+
+def gate(summary: dict, key: str) -> list[str]:
+    """What fails the pass marks in thresholds.yaml for this run. An errored run means rerun."""
+    marks = yaml.safe_load(THRESHOLDS.read_text()).get(key)
+    if marks is None:
+        return [f"no pass marks for {key!r} in thresholds.yaml"]
+    if summary.get("errored"):
+        return [f"{len(summary['errored'])} errored runs: rerun (an outage is not a quality failure)"]
+    failures = []
+    if "min_pass_rate" in marks and summary["passed"] / summary["total"] < marks["min_pass_rate"]:
+        failures.append(f"suite passed {summary['passed']}/{summary['total']}: {summary['failed']}")
+    checks = {
+        "min_main_recall": ("main recall", summary.get("main", {}).get("recall")),
+        "min_main_precision": ("main precision", summary.get("main", {}).get("precision")),
+        "min_quotes_verified_share": (
+            "verified quote share",
+            summary.get("quotes", {}).get("verified_share"),
+        ),
+    }
+    for mark, (name, value) in checks.items():
+        if mark in marks and (value is None or value < marks[mark]):
+            failures.append(f"{name} {value} is under {marks[mark]}")
+    return failures
 
 
 def record_for(item: dict, state: dict, latency_ms: int) -> dict:
@@ -133,6 +160,7 @@ def main() -> None:
     parser.add_argument("--concurrency", type=int, default=8)
     parser.add_argument("--name", help="the run folder's name (default: date-config-source)")
     parser.add_argument("--frozen", action="store_true", help="required for --split eval")
+    parser.add_argument("--gate", action="store_true", help="exit 1 if the run misses thresholds.yaml")
     args = parser.parse_args()
 
     if settings.llm_backend() == "fake":
@@ -166,6 +194,12 @@ def main() -> None:
         summary |= summarize(records)
     (folder / "summary.json").write_text(json.dumps(summary, indent=1) + "\n")
     print(json.dumps({k: summary[k] for k in summary if k not in ("calibration",)}, indent=1))
+    if args.gate:
+        key = args.suite or ("dev50" if args.split == "dev" and args.limit == 50 else f"{args.split}")
+        failures = gate(summary, key)
+        print("GATE PASSED" if not failures else "GATE FAILED:\n  " + "\n  ".join(failures))
+        if failures:
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

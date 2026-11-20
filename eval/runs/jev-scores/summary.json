@@ -1,0 +1,149 @@
+{
+ "jev_model": "jev-1.14.0",
+ "rule": "largest cut-off clearing at most 2% of Sonnet-flagged dev postings",
+ "cut_off": 0.17,
+ "fit_on_dev": {
+  "postings": 300,
+  "sonnet_flagged_cleared": "1/72",
+  "sonnet_flagged_cleared_rate": 0.0139,
+  "sonnet_flagged_cleared_upper_95": 0.0642,
+  "cleared_share": 0.55,
+  "gold_fraud_cleared": "18/75"
+ },
+ "held_out_jev_fit_300": {
+  "postings": 300,
+  "sonnet_flagged_cleared": "1/57",
+  "sonnet_flagged_cleared_rate": 0.0175,
+  "sonnet_flagged_cleared_upper_95": 0.0805,
+  "cleared_share": 0.5633,
+  "gold_fraud_cleared": "15/45"
+ },
+ "gold_fraud_view": {
+  "jev_fit": {
+   "fraud_cleared": "148/552",
+   "fraud_cleared_rate": 0.2681,
+   "fraud_cleared_upper_95": 0.3009,
+   "legit_cleared_rate": 0.6447,
+   "cleared_at_real_rate": 0.6266,
+   "errored": 0
+  },
+  "dev": {
+   "fraud_cleared": "18/75",
+   "fraud_cleared_rate": 0.24,
+   "fraud_cleared_upper_95": 0.3348,
+   "legit_cleared_rate": 0.6533,
+   "cleared_at_real_rate": 0.6335,
+   "errored": 0
+  }
+ },
+ "curve_on_dev": {
+  "0.05": {
+   "sonnet_flagged_cleared_rate": 0.0,
+   "cleared_share": 0.1867
+  },
+  "0.1": {
+   "sonnet_flagged_cleared_rate": 0.0,
+   "cleared_share": 0.4533
+  },
+  "0.15": {
+   "sonnet_flagged_cleared_rate": 0.0139,
+   "cleared_share": 0.5433
+  },
+  "0.2": {
+   "sonnet_flagged_cleared_rate": 0.0417,
+   "cleared_share": 0.5867
+  },
+  "0.25": {
+   "sonnet_flagged_cleared_rate": 0.0694,
+   "cleared_share": 0.6333
+  },
+  "0.3": {
+   "sonnet_flagged_cleared_rate": 0.0833,
+   "cleared_share": 0.65
+  },
+  "0.35": {
+   "sonnet_flagged_cleared_rate": 0.0833,
+   "cleared_share": 0.6667
+  },
+  "0.4": {
+   "sonnet_flagged_cleared_rate": 0.0972,
+   "cleared_share": 0.69
+  },
+  "0.45": {
+   "sonnet_flagged_cleared_rate": 0.0972,
+   "cleared_share": 0.7033
+  },
+  "0.5": {
+   "sonnet_flagged_cleared_rate": 0.125,
+   "cleared_share": 0.73
+  },
+  "0.55": {
+   "sonnet_flagged_cleared_rate": 0.1389,
+   "cleared_share": 0.7367
+  },
+  "0.6": {
+   "sonnet_flagged_cleared_rate": 0.1389,
+   "cleared_share": 0.74
+  },
+  "0.65": {
+   "sonnet_flagged_cleared_rate": 0.1389,
+   "cleared_share": 0.75
+  },
+  "0.7": {
+   "sonnet_flagged_cleared_rate": 0.1667,
+   "cleared_share": 0.7567
+  }
+ },
+ "stability_dev": {
+  "mean_abs_score_change": 0.0051,
+  "max_score_change": 0.13,
+  "clear_decisions_flipped": 2
+ },
+ "agreement_with_sonnet_dev": {
+  "\u00a71": {
+   "mean_jev_when_sonnet_flagged": 0.97,
+   "mean_jev_when_sonnet_not": 0.038,
+   "sonnet_flagged": 1,
+   "jev_under_cut_off_but_sonnet_flagged": 0
+  },
+  "\u00a72": {
+   "mean_jev_when_sonnet_flagged": 0.85,
+   "mean_jev_when_sonnet_not": 0.058,
+   "sonnet_flagged": 1,
+   "jev_under_cut_off_but_sonnet_flagged": 0
+  },
+  "\u00a73": {
+   "mean_jev_when_sonnet_flagged": null,
+   "mean_jev_when_sonnet_not": 0.047,
+   "sonnet_flagged": 0,
+   "jev_under_cut_off_but_sonnet_flagged": 0
+  },
+  "\u00a74": {
+   "mean_jev_when_sonnet_flagged": 0.688,
+   "mean_jev_when_sonnet_not": 0.065,
+   "sonnet_flagged": 11,
+   "jev_under_cut_off_but_sonnet_flagged": 0
+  },
+  "\u00a75": {
+   "mean_jev_when_sonnet_flagged": 0.804,
+   "mean_jev_when_sonnet_not": 0.125,
+   "sonnet_flagged": 72,
+   "jev_under_cut_off_but_sonnet_flagged": 5
+  }
+ },
+ "injection_question": {
+  "jev_fit": {
+   "at_or_over_threshold": 5,
+   "of": 3552,
+   "max": 0.56,
+   "median": 0.23
+  },
+  "dev": {
+   "at_or_over_threshold": 0,
+   "of": 300,
+   "max": 0.46,
+   "median": 0.23
+  }
+ },
+ "cost_usd": 0.2267
+}

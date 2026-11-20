@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useShared, type Tagged } from "../context";
 import { USERS } from "../roles";
+import { dragEdge } from "../lib/drag";
 import { PanelToggle } from "./PanelToggle";
 import { RelabelProgress, useRelabel } from "./Relabel";
 
@@ -19,16 +20,10 @@ export function SidePanel() {
   const shownVersion = versions.find((v) => v.name === shown);
   const relabel = useRelabel(live); // after a publish, watch the re-label from any page
 
+  // the panel's right edge is the window's; dragging its left edge sets the width
   const startResize = (e: React.PointerEvent) => {
-    e.preventDefault();
     const right = box.current?.getBoundingClientRect().right ?? window.innerWidth;
-    const move = (ev: PointerEvent) => setPanelWidth(right - ev.clientX);
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    dragEdge(e, (x) => right - x, setPanelWidth);
   };
 
   return (

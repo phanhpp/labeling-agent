@@ -2,7 +2,7 @@
 
 Nov 19, 2026, updated Nov 20 with measured numbers · @Anh
 
-A queue-based labeling service on AWS. Jev screens every posting, Claude Sonnet 5.5 labels the rest with verbatim evidence, and code sets the label. The policy is versioned data, so a change ships without a deploy. Targets: 200,000 posts a day, 5x peaks, 95% labeled within 60 seconds, weekly policy changes with 30-day re-labels. *Measured* figures come from Part B ([RESULTS.md](RESULTS.md)).
+A queue-based labeling service on AWS: Jev screens every posting, Claude Sonnet 5.5 labels the rest with verbatim evidence, code sets the label, and the policy is versioned data. Targets: 200,000 posts a day, 5x peaks, 95% labeled within 60 seconds, weekly policy changes with 30-day re-labels. *Measured* figures come from Part B ([RESULTS.md](RESULTS.md)).
 
 ## 1. Architecture
 
@@ -18,19 +18,17 @@ flowchart LR
 
 Three ECS services in private subnets, reached from API Gateway through VPC Link and an internal ALB, scale on their own and never call each other: the **Intake API** saves postings, queues them and returns 202; **workers** run the agent; the **Analyst API** serves the analyst app. Only Jev and LangSmith calls leave AWS, through NAT. Labels reach the marketplace by signed SNS webhook, with polling as the fallback.
 
-**Endpoints.** `/v1` (marketplaces): submit one posting or a batch of 500, each item accepted or rejected; read a label; follow a batch. `/ui` (analysts): browse, open a decision, override. `/policies`: diff, draft, Test, publish, roll out.
+**Endpoints.** `/v1` for marketplaces (submit one or a batch of 500, read a label), `/ui` for analysts (browse, inspect, override), `/policies` (draft, Test, publish, roll out).
 
-**Labels are never overwritten:** one row per (job, policy version, model version). The API returns the analyst's decision if any, else the live version's label, else an older one marked stale, so a rollback only switches the live version.
+**Labels are never overwritten:** one row per job, policy version and model version, so a rollback only switches the live version. An analyst's decision always wins.
 
-**Queues and storage.** Workers take live jobs before re-labels and Test runs, cap concurrency below the model quota and delete a message only once its label is saved; after 3 failures the post goes to the DLQ and is held for review. Aurora holds postings, labels with per-section findings and drafts; S3 keeps each published policy frozen; AppConfig says which version is live.
+**Queues and storage.** Workers take live jobs before re-labels and Test runs, under a cap below the model quota. Aurora holds postings, labels with per-section findings and drafts; S3 keeps each published policy frozen; AppConfig says which version is live.
 
-**Policy as data.** Editors change sections (text, effect, examples, screen question, fraud words) in a draft. *Test* labels recent posts in shadow and lists the labels that would flip. *Publish*, by a publisher who didn't edit it, freezes the version and rolls it out 5%, 25%, 100% with automatic rollback. Re-labels touch only what changed: Test labels are kept, a changed effect is recomputed in code (*measured*: $0), a new section is checked alone.
+**Policy as data.** Editors change sections (text, effect, examples, screen question, fraud words) in a draft. *Test* labels recent posts in shadow and lists the labels that would flip. *Publish*, by a publisher who didn't edit it, freezes the version and rolls it out 5%, 25%, 100% with automatic rollback. Posts the Test labeled keep those labels.
 
 **Security.**
 - **Access:** Cognito groups on every route, deny by default. Viewers read; editors override, edit drafts and Test; publishers publish, never a draft they edited. A marketplace sees only its own postings.
-- **Input:** schema checks and a size cap; HTML, hidden text and control characters cleaned; the posting fenced in `<posting>` tags.
-- **Injection:** a phrase list runs before any model; a hit, or a Jev injection score of 0.5 or more, holds the post at NEEDS\_REVIEW and Sonnet never reads it. Residual risk: an injection that passes both reaches Sonnet, which has no tools and can't set the label.
-- **API:** per-client rate limits, WAF, idempotent on `job_id`, no posting text in logs.
+- **Input and API:** schema checks, size caps, per-client rate limits and WAF; postings cleaned and fenced in `<posting>` tags; injections held before Sonnet reads them (section 4); no posting text in logs.
 
 | Chose | Over | Why |
 | --- | --- | --- |
@@ -60,11 +58,11 @@ Live traffic peaks at 11.6 posts a second (116 at 10x); re-labeling 6 million po
 | C: Jev, then Haiku, Sonnet on the hardest 2% | about $0.50 | about $3,000 |
 | Fallback: Haiku screen while Jev is down | $4.72 (*measured*, dev) | about $300 a day extra while down |
 
-B over C: in C most VIOLATING labels would rest on the cheaper model. Next savings: shorter output (about $4,400 a month) and the result cache for the 10% of posts that are repeats (*measured*; about $1,600). A re-label costs $0 when only effects change (*measured*), about $1,500 for a new section, about $8,300 for everything. Prices as of 20 Nov 2026 ([Sonnet](https://www.llmreference.com/model/claude-sonnet-5-5/aws-bedrock), [Haiku](https://www.llmreference.com/model/claude-haiku-5-5/aws-bedrock), [Jev](https://flaviocopes.com/jev-pricing/), [Aurora](https://book.st-hakky.com/en/data-platform/rds-mysql-vs-aurora-cost-comparison)).
+B over C: in C most VIOLATING labels would rest on the cheaper model. Next savings: shorter output (about $4,400 a month) and the result cache for the 10% of posts that repeat (about $1,600). A re-label costs $0 when only outcomes change, about $1,500 for a new section, about $8,300 for everything. Prices as of 20 Nov 2026 ([Sonnet](https://www.llmreference.com/model/claude-sonnet-5-5/aws-bedrock), [Haiku](https://www.llmreference.com/model/claude-haiku-5-5/aws-bedrock), [Jev](https://flaviocopes.com/jev-pricing/), [Aurora](https://book.st-hakky.com/en/data-platform/rds-mysql-vs-aurora-cost-comparison)).
 
 ## 4. Agent design
 
-A fixed LangGraph graph, not an open-ended loop; any failure ends in NEEDS\_REVIEW, never a silent ALLOWED.
+A fixed LangGraph graph, not an open-ended loop.
 
 ```mermaid
 flowchart LR
@@ -80,21 +78,33 @@ flowchart LR
   R --> F
 ```
 
-1. **Clean** HTML and hidden text; note empty fields for §5. **Cache** on what the models read, the policy and the model ids.
-2. **Screen.** Jev answers one question per section, from policy data, plus "does this posting instruct an AI?". It clears a post only if every section scores under 0.17 (fitted on dev data), injection under 0.5, and no fraud word matches.
-3. **Escalate.** Sonnet reads the policy and the fenced posting and returns, per section, matched, not matched or unsure, with verbatim quotes. It never states the label.
-4. **Check and decide in code.** Quotes not found word for word are dropped (*measured*: 97% are found), and a section left without one becomes unsure. A matched VIOLATING section gives VIOLATING; unsure, or §5 alone, NEEDS\_REVIEW; none, ALLOWED.
+**How it uses the policy**
+- **Dynamic prompting:** every prompt is assembled at run time from the job's policy version, not static context.
+- **Calibrated screening:** each section becomes one yes/no question for Jev, which returns a calibrated probability; posts skip Claude only when every score falls under a cut-off tuned on labeled data.
+- **Prompt caching:** the policy goes first and the posting last, so the policy is cached once per version and each post pays only for its own text.
+- **Outcomes as data:** each section declares what a match means; changing it re-labels old posts from stored answers, with no model call.
+- **Zero-deploy updates:** a published version goes live on the workers' next job; only new or edited sections are re-asked on past posts.
 
-**Failures.** Jev gets 3 tries, then Haiku screens; if both fail, Sonnet labels the post, marked `screen_unavailable`. A Sonnet error retries the job 3 times, then the DLQ. Limits: Jev 5 s per try, model calls 20 s, 45 s per job, a daily spend cap. A checkpointer resumes a redelivered job from its last node, so models aren't paid twice.
+**How it produces evidence.** Sonnet quotes the posting per section; code finds each quote word for word and stores its position for the UI to highlight, dropping any it can't find (*measured*: 97% are found). §5 can rest on a verified empty field, such as no company profile.
 
-**Tools and models.** No tools or retrieval: the policy fits in the prompt, and past postings can't teach sections. Jev gives calibrated scores cheaply; Sonnet is strong at structured output and verbatim quotes; a classical classifier would need retraining for every new section.
+**Handling uncertainty**
+- **Escalate unless sure:** the Jev cut-off is tuned so at most 2% of posts Claude would flag get cleared without it; anything else goes to Sonnet.
+- **Unsure is an answer:** an unsure section sends the post to a person instead of forcing a guess.
+- **Evidence or no verdict:** a section left without a verified quote becomes unsure, never VIOLATING.
+- **Injection held, not judged:** a known phrase or a high Jev injection score sends the post to review unread; the threshold is tuned to hold at most 1 in 1,000 ordinary posts while catching every test injection, held-out wording included.
+
+**Handling failures**
+- **Retries and time limits:** Jev 3 tries on server errors and rate limits; a failed Sonnet call retries the job with a wait, up to 3 attempts; 20 s per model call, 45 s per job.
+- **Fallbacks:** Jev down, Haiku screens with the same questions; both down, Sonnet reads every post.
+- **Fail closed:** after 3 failed attempts the post is held at NEEDS\_REVIEW with a reason code, never ALLOWED.
+- **Crash recovery:** each finished step is saved, so a redelivered job resumes without paying the models twice.
+
+**Tools.** None: the policy fits in the prompt. The first to add is the employer's history (section 5).
 
 ## 5. Evaluation and quality over time
 
-**Offline.** The fixed 400 are only for reported numbers, never for prompts, thresholds or the gate; development uses the other rows minus 586 copies of eval posts. We report precision, recall and F1 with 95% ranges, with NEEDS\_REVIEW counted as caught (headline) and not (strict), a confusion matrix, precision at 4.8%, cost, latency and 5 to 10 errors.
+**Offline.** The fixed 400 are only for reported numbers, never for prompts, thresholds or the gate: precision, recall and F1 with 95% ranges, NEEDS\_REVIEW counted as caught (headline) and not (strict), a confusion matrix, cost, latency and errors by cause. A gate of suites (decisions, edge cases, injection, policy change) runs in CI on every agent or prompt change.
 
-**What the 400 showed** (*measured*). 59 of 100 fraud flagged, no legitimate post VIOLATING. §5 drives precision: 68 of 100 fraud and 57 of 300 legitimate posts have no company profile. Jev cleared 26 of 100 fraud, above the 2% target, but Claude alone would have allowed 18 of 19 such posts: the misses come from the policy, not the screen. Most are clean ads whose company profile appears only on other fraud. **Checking the employer's history would catch 27 of the 41 with no new false alarms: the first tool to add.**
+**What the 400 showed** (*measured*). 59 of 100 fraud flagged, no legitimate post VIOLATING. §5 drives precision: 68 of 100 fraud and 57 of 300 legitimate posts have no company profile. The misses come from the policy, not the screen: Claude alone would have allowed almost all the fraud Jev cleared. Most are clean ads whose company profile appears only on other fraud, so **checking the employer's history would catch 27 of the 41 with no new false alarms.**
 
-**The gate.** Suites for decisions, edge cases, injection and policy change, with pass marks from a 3-run baseline, run in CI on every agent or prompt change.
-
-**Production.** Code checks run on every post; LLM judges score a 0.25% LangSmith sample, low scores going to an annotation queue. 1% of Jev-cleared posts get a human audit, the only independent check on Jev. Alerts watch errors, p95, spend and Jev; drift is checked daily per version (label rates, Jev's clear rate, injection flags, near-identical posts). Any change ships through the gate, a shadow Test, a phased rollout and the re-label.
+**Production.** LLM judges score a small LangSmith sample, low scores going to an annotation queue; 1% of Jev-cleared posts get a human audit, the only independent check on Jev. Drift is checked daily per version (label rates, Jev's clear rate, injection flags). Any change ships through the gate, a shadow Test and a phased rollout.

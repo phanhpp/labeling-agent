@@ -151,6 +151,9 @@ test("roles on a draft: a viewer reads, an editor submits, an editing publisher 
   await expect(page.getByTestId("flip-report")).toContainText("Test passed.");
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByText(/^Published\./)).toBeVisible();
+  // Without reloading the page, the header and the side panel show v2 as latest and live.
+  await expect(page.getByTestId("viewing")).toContainText("Showing policy v2 (live)");
+  await expect(page.getByRole("button", { name: "Compare v1 → v2" })).toBeEnabled();
   await page.goto("/versions");
   await expect(page.locator("tr", { hasText: "v2" }).locator(".status").first()).toHaveText("live");
   await expect(page.getByTestId("viewing")).toContainText("v2");

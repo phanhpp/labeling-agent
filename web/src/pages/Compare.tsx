@@ -29,10 +29,13 @@ export default function Compare() {
       <h1 className="page-title">How labels changed from {from} to {to}</h1>
       <p className="muted">
         {data.postings} postings are labeled under both. <b>{data.changed}</b> changed label or sections.
-        {data.changed > 0 && (
+        {data.changed > 0 && data.from_the_change === data.changed && (
+          <> {data.changed === 1 ? "It involves" : "All involve"} a section that differs between {from} and {to}.</>
+        )}
+        {data.from_the_change < data.changed && (
           <>
-            {" "}{data.from_the_change} of those involve a section that differs between {from} and {to}; the others are
-            Claude answering differently when asked again.
+            {" "}{data.from_the_change} involve a section that differs between {from} and {to}; the other{" "}
+            {data.changed - data.from_the_change} are Claude answering differently when asked again.
           </>
         )}
       </p>

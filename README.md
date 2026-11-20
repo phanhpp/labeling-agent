@@ -131,7 +131,13 @@ After `make demo`, at http://localhost:8000:
 
 ## Your data
 
-**The local database.** The app keeps its data in a Postgres database in Docker on your machine: the postings it was sent, their labels under each policy version, the policy versions and drafts, analysts' decisions, the job queue and each run's saved steps. `make down` keeps it; `make reset` deletes it, so the next start is empty with policy v1. The dataset file and the eval results are never stored there.
+**The local database.** A Postgres database in Docker on your machine holds what the app has seen or made:
+- the postings it was sent, and their labels under each policy version;
+- the policy versions and drafts;
+- analysts' decisions;
+- the job queue and each run's saved steps.
+
+`make down` **keeps** it; `make reset` **deletes** it, so the next start is empty with policy v1. The dataset file and the eval results are never stored there.
 
 **How the dataset is split.** The dataset has 17,880 postings, about 5% fraud. The split keeps anything used for tuning away from what is reported (recorded in `data/splits.json`):
 

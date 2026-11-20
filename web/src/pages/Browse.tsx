@@ -157,7 +157,7 @@ export default function Browse() {
             <div className="listbar">
               <span>
                 {data.total === 0 ? "No postings" : `${offset + 1}–${Math.min(offset + per, data.total)} of ${data.total}`}
-                {filters.label || filters.section || filters.job_id ? " matching the filters" : ""} · labels under {data.version} · newest first
+                {filters.label || filters.section || filters.job_id ? " matching the filters" : ""} · labels under {data.version} · newest postings first
               </span>
               {health?.demo?.enabled && (
                 <label className="switch" title="Demo: the dataset's own answer next to ours. Off, the list looks like production.">

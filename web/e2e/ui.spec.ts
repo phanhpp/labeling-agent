@@ -177,6 +177,10 @@ test("the side panel folds, shows an older version without changing what is live
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeHidden();
   await page.keyboard.press("ControlOrMeta+Alt+KeyB");
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeVisible();
+  // the "Showing policy" label in the top bar opens the workspace on its policy picker
+  await page.getByRole("button", { name: "Hide the workspace" }).click();
+  await page.getByTestId("viewing").click();
+  await expect(page.getByLabel("Policy shown")).toBeFocused();
 
   // the list's filters hide too; the list keeps its filter, and the hidden toggle shows a dot
   await page.getByRole("button", { name: "NEEDS REVIEW" }).click();

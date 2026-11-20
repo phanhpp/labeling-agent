@@ -313,7 +313,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 .tag.latest { background: #eff4ff; color: #1d4ed8; }
 .whoami { display: inline-flex; align-items: center; gap: 6px; height: var(--h-btn-sm); padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--fs-sm); background: var(--paper); }
 .whoami b { font-weight: 650; }
-.viewing { font-size: var(--fs-sm); color: var(--muted); }
+.viewing { font-size: var(--fs-sm); color: var(--muted); height: var(--h-btn-sm); padding: 0 10px; border: 1px solid transparent; border-radius: 999px; background: none; }
+.viewing:hover { border-color: var(--line); background: var(--paper); color: var(--ink); }
 .viewing b { color: var(--ink); }
 .status.submitted { color: #1d4ed8; background: #eff4ff; }
 .confirm { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--violating); }

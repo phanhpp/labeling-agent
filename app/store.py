@@ -433,7 +433,8 @@ async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset
     params = {"batch": None, "disagree": False, **filters, "limit": limit, "offset": offset}
     rows = await (
         await conn.execute(
-            _BROWSE + " WHERE " + " AND ".join(where) + " ORDER BY l.created_at DESC, l.id DESC"
+            # newest postings first, by arrival: the same order under every policy version
+            _BROWSE + " WHERE " + " AND ".join(where) + " ORDER BY p.created_at DESC, p.id DESC"
             " LIMIT %(limit)s OFFSET %(offset)s",
             params,
         )

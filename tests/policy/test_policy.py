@@ -1,12 +1,11 @@
 import copy
-from pathlib import Path
 
 import pytest
 
 from app import policy
 from app.policy import PolicyError
 
-V1 = Path(__file__).resolve().parents[1] / "policies" / "v1.yaml"
+V1 = policy.POLICIES_DIR / "v1.yaml"
 
 
 @pytest.fixture

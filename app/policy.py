@@ -17,6 +17,7 @@ from pathlib import Path
 
 import yaml
 
+POLICIES_DIR = Path(__file__).resolve().parents[1] / "policies"
 EFFECTS = ("VIOLATING", "NEEDS_REVIEW")
 _CODE = re.compile(r"^§\d+$")
 
@@ -89,13 +90,14 @@ def validate(body: dict) -> dict:
     return body
 
 
-def _sha256(value) -> str:
+def stable_hash(value) -> str:
+    """sha256 of the value as canonical JSON: the same data always gives the same hash."""
     canonical = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def content_hash(body: dict) -> str:
-    return _sha256(body)
+    return stable_hash(body)
 
 
 def jev_key(code: str) -> str:
@@ -133,7 +135,7 @@ def model_view(body: dict) -> dict:
 
 
 def model_hash(body: dict) -> str:
-    return _sha256(model_view(body))
+    return stable_hash(model_view(body))
 
 
 def render_sections(body: dict) -> str:

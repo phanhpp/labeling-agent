@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, explain, type Policy, type Report } from "../api";
+import { RelabelProgress, useRelabel } from "../components/Relabel";
 import { ErrorNote, LabelBadge, SectionTag, color, useLoad } from "../components/ui";
 import { useShared } from "../context";
 
@@ -30,6 +31,7 @@ export default function Version() {
         {data.edited_by.length > 0 && <> · edited by {data.edited_by.join(", ")}</>}
         {data.published_by && <> · {who(data.published_by, "published")}</>}
       </p>
+      {isDraft && user.role !== "viewer" && <Discard name={data.name} notify={setMessage} />}
       {message && <p className="message" role="status">{message}</p>}
       {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={refresh} />}
       {data.diff && <Changes policy={data} />}
@@ -64,14 +66,38 @@ function DraftGuide({ policy }: { policy: Policy }) {
   );
 }
 
+// Throw a draft away, with its Test. Published versions can't be: every label traces to its policy.
+function Discard({ name, notify }: { name: string; notify: (m: string) => void }) {
+  const { refreshVersions } = useShared();
+  const navigate = useNavigate();
+  const [asking, setAsking] = useState(false);
+  const discard = () =>
+    api.discardDraft(name).then(
+      () => { refreshVersions(); navigate("/versions", { state: { message: `Draft ${name} discarded.` } }); },
+      (e) => { setAsking(false); notify(explain(e)); },
+    );
+  return (
+    <div className="discard">
+      {asking ? (
+        <span className="confirm">
+          Discard {name} and its Test? This can't be undone.
+          <button className="small" onClick={discard}>Discard</button>
+          <button className="small" onClick={() => setAsking(false)}>Keep it</button>
+        </span>
+      ) : (
+        <button className="small" onClick={() => setAsking(true)}>Discard this draft</button>
+      )}
+    </div>
+  );
+}
+
 // A published version can't change, so every label traces to the exact policy it used.
 function PublishedNote({ policy, notify, onChange }: { policy: Policy; notify: (m: string) => void; onChange: () => void }) {
   const { user } = useShared();
   const navigate = useNavigate();
   const { data: versions } = useLoad(api.versions, []);
   const next = `v${Math.max(0, ...(versions ?? []).map((v) => Number(v.name.replace(/\D/g, "")) || 0)) + 1}`;
-  const { data: relabel } = useLoad(() => api.relabel(policy.name), [policy.name]);
-  const pending = relabel ? (relabel.jobs.queued ?? 0) + (relabel.jobs.running ?? 0) : 0;
+  const relabel = useRelabel(policy.name);
   return (
     <div className="note">
       <p>
@@ -79,13 +105,8 @@ function PublishedNote({ policy, notify, onChange }: { policy: Policy; notify: (
         be changed, so every label can be traced to the exact policy it used.
         {policy.status === "live" && " To change the policy, create a draft from it."}
       </p>
-      {relabel && (
-        <p className="muted">
-          {relabel.labels} labels under {policy.name}
-          {relabel.labels_without_a_model_call > 0 && <>, {relabel.labels_without_a_model_call} of them decided again in code at no cost</>}
-          {pending > 0 && <>; {pending} postings are being labeled again</>}.
-        </p>
-      )}
+      <RelabelProgress relabel={relabel} />
+      {relabel && !relabel.relabel?.total && <p className="muted">{relabel.labels} postings labeled under {policy.name}.</p>}
       <div className="buttons">
         {policy.status === "live" && user.role !== "viewer" && (
           <button className="primary" onClick={() => api.createDraft(next).then((v) => { onChange(); navigate(`/versions/${v.name}`); }, (e) => notify(explain(e)))}>
@@ -146,7 +167,11 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
   const { user } = useShared();
   const [report, setReport] = useState<Report | null>(null);
   const [polls, setPolls] = useState(0);
-  const [size, setSize] = useState(100);
+  // Publish labels these recent postings again, except those the Test labeled: testing all of them
+  // costs the same up front and leaves Publish nothing to run.
+  const scope = policy.relabel_scope ?? 0;
+  const sizes = [...TEST_SIZES.filter((n) => n < scope), ...(scope ? [scope] : [])];
+  const [size, setSize] = useState(() => Math.min(scope || 100, 100));
 
   useEffect(() => {
     api.report(policy.name).then(setReport, () => setReport(null));
@@ -177,7 +202,7 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
           <label className="buttons">
             Test on
             <select className="small" aria-label="How many postings to test" value={size} onChange={(e) => setSize(Number(e.target.value))}>
-              {TEST_SIZES.map((n) => <option key={n} value={n}>{n} recent postings</option>)}
+              {sizes.map((n) => <option key={n} value={n}>{n === scope ? `all ${n} recent postings` : `${n} recent postings`}</option>)}
             </select>
           </label>
           {running ? (
@@ -196,13 +221,19 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
           )}
           {user.role === "publisher" && (
             <button className="primary" disabled={!!publishBlocked} title={publishBlocked}
-              onClick={() => act(() => api.publish(policy.name), "Published. Recent postings are being labeled again.")}>
+              onClick={() => act(() => api.publish(policy.name), "Published. Recent postings the Test didn't cover are being labeled again.")}>
               Publish
             </button>
           )}
         </div>
       ) : (
         <p className="hint">Viewers can read drafts and their Test. Editors test and submit; publishers publish.</p>
+      )}
+      {canEdit && scope > 0 && (
+        <p className="hint" data-testid="test-scope">
+          Publish labels the {scope} recent postings again, except those this Test already labeled. Testing all {scope} costs
+          the same, just before you decide, and leaves Publish nothing to run.
+        </p>
       )}
       {user.role === "editor" && !passed && <p className="hint">Submit needs a finished, passing Test of the current draft.</p>}
       {user.role === "publisher" && publishBlocked && <p className="hint" data-testid="publish-blocked">{publishBlocked}</p>}

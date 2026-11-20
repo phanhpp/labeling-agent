@@ -26,7 +26,7 @@ def main() -> None:
         base_url=args.url, headers={"Authorization": f"Bearer {demo_token('editor')}"}, timeout=30
     )
     if any(v["name"] == args.name for v in editor.get("/policies").json()):
-        sys.exit(f"{args.name} already exists: make reset, then make demo, to start again")
+        sys.exit(f"{args.name} already exists: discard it on its page in the UI, or choose another --name")
     out = editor.post("/policies/drafts", json={"name": args.name, "body": body})
     out.raise_for_status()
     print(f"draft {args.name} created from {args.file}: open {args.url}/versions/{args.name}, then Test it")

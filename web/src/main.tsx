@@ -1,6 +1,6 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, NavLink, Route, Routes } from "react-router";
+import { BrowserRouter, NavLink, Route, Routes, useLocation } from "react-router";
 import { api } from "./api";
 import { Chevron, SidePanel } from "./components/SidePanel";
 import { useLoad } from "./components/ui";
@@ -49,10 +49,22 @@ function Header() {
   );
 }
 
+// A new page starts at the top. Only the path counts: paging or filtering a list keeps the place.
+// The braces matter: newer Chrome returns a Promise from scrollTo, and an effect must return
+// nothing or a cleanup function (returning the Promise blanked the page on the next navigation).
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   const { user, viewing, panelOpen, setPanelOpen, panelWidth } = useShared();
   return (
     <>
+      <ScrollToTop />
       <Header />
       <div className={`layout ${panelOpen ? "" : "folded"}`} style={{ "--side-w": `${panelWidth}px` } as React.CSSProperties}>
         {/* key: switching user or version reloads the page's data */}

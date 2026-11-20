@@ -2,6 +2,7 @@
 // role may do. Errors come back as ApiError with the API's code (e.g. "forbidden", "four_eyes").
 
 import { pageWindow, type Filters } from "./lib/filters";
+import type { RelabelCounts } from "./lib/words";
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string, public detail?: unknown) {
@@ -67,12 +68,17 @@ export type CompareRow = {
   old: { label_id: number; label: string; sections: string[] }; new: { label_id: number; label: string; sections: string[] };
 };
 export type Comparison = { old: string; new: string; postings: number; changed: number; from_the_change: number; rows: CompareRow[] };
-export type Policy = Version & { body: any; diff?: { against: string; changes: { where: string; change: string; models_see_it: boolean }[] } };
+export type Policy = Version & { body: any; relabel_scope?: number; diff?: { against: string; changes: { where: string; change: string; models_see_it: boolean }[] } };
 export type Flip = { job_id: string; label_id: number; before: { label: string; sections: string[] }; after: { label: string; sections: string[] }; from_the_change: boolean };
 export type Report = {
   version: string; compared_with: string; mode: string; jobs: Record<string, number>; labeled: number;
   changed: Record<string, number>; flips: Flip[]; flips_from_the_change: number; model_calls: number; cost_usd: number;
   invariants: { name: string; passed: boolean }[]; passed: boolean; tested_current_content: boolean;
+};
+export type { RelabelCounts };
+export type Relabel = {
+  version: string; status: string; labels: number; labels_without_a_model_call: number; cost_usd: number;
+  jobs: Record<string, number>; relabel: RelabelCounts | null; new_postings: number;
 };
 export type Health = { live_labeling: boolean; missing_keys: string[]; agent_config: string; llm_backend: string };
 
@@ -92,13 +98,14 @@ export const api = {
   createDraft: (name: string) => request<Version>("/policies/drafts", json("POST", { name })),
   saveDraft: (name: string, body: any) => request<Version>(`/policies/drafts/${name}`, json("PUT", { body })),
   startTest: (name: string, limit = 100) => request(`/policies/drafts/${name}/test?limit=${limit}`, json("POST")),
+  discardDraft: (name: string) => request<{ discarded: string; labels_deleted: number }>(`/policies/drafts/${name}`, json("DELETE")),
   stopTest: (name: string) => request<{ dropped: number }>(`/policies/drafts/${name}/test/stop`, json("POST")),
   submit: (name: string) => request<Version>(`/policies/drafts/${name}/submit`, json("POST")),
   compare: (from: string, to: string) => request<Comparison>(`/ui/compare?from=${from}&to=${to}`),
   report: (name: string) => request<Report>(`/policies/drafts/${name}/test`),
   publish: (name: string) => request<{ mode: string; queued: number; redecided: number }>(`/policies/drafts/${name}/publish`, json("POST")),
   rollback: (name: string) => request(`/policies/live`, json("PUT", { name })),
-  relabel: (name: string) => request<{ labels: number; labels_without_a_model_call: number; cost_usd: number; jobs: Record<string, number> }>(`/policies/${name}/relabel`),
+  relabel: (name: string) => request<Relabel>(`/policies/${name}/relabel`),
 };
 
 // What an error means, in plain words for the page.
@@ -110,7 +117,9 @@ const MESSAGES: Record<string, string> = {
   test_outdated: "The draft changed after its last Test, or was never tested. Run Test first.",
   test_not_passed: "The Test hasn't finished, or one of its checks failed.",
   parent_not_live: "The version this draft started from is no longer live. Create the draft again.",
-  not_a_draft: "Published versions can't be edited.",
+  not_a_draft: "Published versions can't be edited or discarded.",
+  test_running: "The Test is still running. Stop it, wait a few seconds, then try again.",
+  draft_in_use: "Labels under another version were copied from this draft's Test, so it can't be discarded.",
   name_taken: "A version with that name already exists.",
   not_retired: "Only a version that was live before can be made live again.",
   invalid_policy: "The policy isn't valid.",

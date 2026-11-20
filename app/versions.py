@@ -1,7 +1,8 @@
 """Policy versions: drafts, Test (a shadow run and its flip report), Publish with re-label, rollback.
 
     draft --edit--> draft --Test--> flip report --Publish--> live --(next publish)--> retired
-                                                               ^---------- rollback ----------'
+      |                                                        ^---------- rollback ----------'
+      '--discard--> gone (with its Test). Published versions are never deleted.
 
 Test labels a sample of recent postings under the draft, without changing what anyone reads:
   - full mode: shadow jobs, run by the worker (lowest priority), with the draft's content hash in
@@ -28,6 +29,7 @@ from psycopg.types.json import Jsonb
 
 from app import policy as policies
 from app import store
+from app.agent import checkpoints
 from app.agent.clean import Cleaned
 from app.agent.decide import FAILURES, redecide
 
@@ -90,12 +92,58 @@ async def update_draft(conn: AsyncConnection, name: str, body: dict, editor: str
     ).fetchone()
 
 
+async def discard_draft(conn: AsyncConnection, name: str) -> dict:
+    """Delete a draft and its Test: the Test's jobs, labels and checkpoints never reached anyone.
+    Published versions can't be discarded: every label must trace to the policy it used."""
+    await _draft(conn, name)
+    running = await (
+        await conn.execute(
+            "SELECT count(*) AS n FROM jobs WHERE policy_version = %s AND status = 'running'", (name,)
+        )
+    ).fetchone()
+    if running["n"]:
+        raise Refused(409, "test_running", "stop the Test, then wait a few seconds for it to finish")
+    copied = await (
+        await conn.execute(
+            "SELECT count(*) AS n FROM labels c JOIN labels d ON c.derived_from = d.id"
+            " WHERE d.policy_version = %s AND c.policy_version <> %s",
+            (name, name),
+        )
+    ).fetchone()
+    if copied["n"]:
+        raise Refused(409, "draft_in_use", "labels under other versions were copied from this draft's Test")
+    async with conn.transaction():
+        threads = await (
+            await conn.execute(
+                "SELECT thread_id FROM jobs WHERE policy_version = %s AND thread_id IS NOT NULL", (name,)
+            )
+        ).fetchall()
+        await checkpoints.delete_threads(conn, [t["thread_id"] for t in threads])
+        labels = (await conn.execute("DELETE FROM labels WHERE policy_version = %s", (name,))).rowcount
+        await conn.execute("DELETE FROM jobs WHERE policy_version = %s", (name,))
+        await conn.execute("DELETE FROM policy_versions WHERE name = %s", (name,))
+    return {"discarded": name, "labels_deleted": labels}
+
+
 def relabel_mode(new: dict, old: dict) -> str:
     """re-decide when the models would see exactly the same thing (only effects changed), else full."""
     return "redecide" if new["model_hash"] == old["model_hash"] else "full"
 
 
 # ---------------------------------------------------------------- Test
+
+
+async def relabel_scope(conn: AsyncConnection, version: str) -> int:
+    """How many postings a publish would label again: those labeled under the version in the last
+    RELABEL_DAYS. A Test of that many covers all of them, so the publish itself runs nothing."""
+    row = await (
+        await conn.execute(
+            "SELECT count(DISTINCT l.posting_id) AS n FROM labels l JOIN postings p ON p.id = l.posting_id"
+            " WHERE l.policy_version = %s AND p.created_at > now() - make_interval(days => %s)",
+            (version, RELABEL_DAYS),
+        )
+    ).fetchone()
+    return row["n"]
 
 
 async def start_test(conn: AsyncConnection, name: str, limit: int = TEST_SAMPLE) -> dict:
@@ -372,24 +420,54 @@ async def rollback(conn: AsyncConnection, name: str) -> dict:
 
 
 async def relabel_progress(conn: AsyncConnection, name: str) -> dict:
+    """The labels under a version, and for a published one, where its re-label stands: postings kept
+    from the Test, labeled again at or after Publish (in code at $0, or by the models), and waiting.
+    Postings that arrived after Publish are counted apart: they are new, not re-labeled."""
     version = await store.policy_version(conn, name)
     if version is None:
         raise Refused(404, "not_found")
     counts = await (
         await conn.execute(
-            "SELECT count(*) AS labels, count(*) FILTER (WHERE derived_from IS NOT NULL AND cost_usd = 0)"
-            " AS without_model, coalesce(sum(cost_usd), 0) AS cost_usd FROM labels"
-            " WHERE policy_version = %s AND policy_hash = %s",
+            """
+            SELECT count(*) AS labels,
+                   count(*) FILTER (WHERE l.derived_from IS NOT NULL AND l.cost_usd = 0) AS without_model,
+                   coalesce(sum(l.cost_usd), 0) AS cost_usd,
+                   count(*) FILTER (WHERE l.created_at < v.published_at) AS kept_from_test,
+                   count(*) FILTER (WHERE l.created_at >= v.published_at AND p.created_at < v.published_at)
+                       AS relabeled,
+                   count(*) FILTER (WHERE l.created_at >= v.published_at AND p.created_at < v.published_at
+                                    AND l.derived_from IS NOT NULL AND l.cost_usd = 0) AS relabeled_in_code,
+                   coalesce(sum(l.cost_usd) FILTER (WHERE l.created_at >= v.published_at
+                                                    AND p.created_at < v.published_at), 0) AS relabel_cost,
+                   count(*) FILTER (WHERE p.created_at >= v.published_at) AS new_postings
+            FROM labels l
+            JOIN postings p ON p.id = l.posting_id
+            JOIN policy_versions v ON v.name = l.policy_version
+            WHERE l.policy_version = %s AND l.policy_hash = %s
+            """,
             (name, version["content_hash"]),
         )
     ).fetchone()
+    jobs = await _job_counts(conn, name, version["content_hash"], "backfill")
+    waiting = jobs.get("queued", 0) + jobs.get("running", 0)
     return {
         "version": name,
         "status": version["status"],
-        "jobs": await _job_counts(conn, name, version["content_hash"], "backfill"),
+        "jobs": jobs,
         "labels": counts["labels"],
         "labels_without_a_model_call": counts["without_model"],
         "cost_usd": round(float(counts["cost_usd"]), 4),
+        "relabel": None
+        if version["published_at"] is None
+        else {
+            "kept_from_test": counts["kept_from_test"],
+            "relabeled": counts["relabeled"],
+            "in_code": counts["relabeled_in_code"],
+            "waiting": waiting,
+            "total": counts["kept_from_test"] + counts["relabeled"] + waiting,
+            "cost_usd": round(float(counts["relabel_cost"]), 4),
+        },
+        "new_postings": counts["new_postings"],
     }
 
 

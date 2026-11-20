@@ -2,22 +2,54 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../api";
 import { ErrorNote, LabelBadge, SectionTag, useLoad } from "../components/ui";
+import { useShared } from "../context";
 
 const PER = 25;
 
 // Every posting labeled under two versions, its label under each side by side. By default only the
-// postings whose label or sections changed.
+// postings whose label or sections changed. The side panel opens it on previous → latest; any two
+// published versions can be picked here.
 export default function Compare() {
-  const [params] = useSearchParams();
-  const from = params.get("from") ?? "";
-  const to = params.get("to") ?? "";
+  const [params, setParams] = useSearchParams();
+  const { versions, previous, latest } = useShared();
+  const from = params.get("from") ?? previous ?? "";
+  const to = params.get("to") ?? latest ?? "";
   const navigate = useNavigate();
-  const { data, error } = useLoad(() => api.compare(from, to), [from, to]);
+  const ready = !!from && !!to && from !== to;
+  const { data, error } = useLoad(() => (ready ? api.compare(from, to) : Promise.resolve(null)), [from, to]);
   const [onlyChanged, setOnlyChanged] = useState(true);
   const [page, setPage] = useState(1);
+  const published = versions.filter((v) => v.status !== "draft");
+  const pick = (key: "from" | "to", value: string) => {
+    setParams({ from, to, [key]: value });
+    setPage(1);
+  };
 
-  if (!from || !to) return <div className="page"><p>Choose two versions in the side panel.</p></div>;
-  if (error) return <div className="page"><ErrorNote error={error} /></div>;
+  const pickers = (
+    <div className="pickers">
+      {(["from", "to"] as const).map((key) => (
+        <label key={key}>
+          <span className="label-text">{key === "from" ? "From" : "To"}</span>
+          <select aria-label={key === "from" ? "Compare from" : "Compare to"} value={key === "from" ? from : to} onChange={(e) => pick(key, e.target.value)}>
+            {published.map((v) => (
+              <option key={v.name} value={v.name}>{v.name}{v.tags.length ? ` (${v.tags.join(", ")})` : ""}</option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
+  );
+
+  if (!ready) {
+    return (
+      <div className="page">
+        <h1 className="page-title">How labels changed</h1>
+        {pickers}
+        <p className="muted">{published.length < 2 ? "Needs two published versions." : "Choose two different versions."}</p>
+      </div>
+    );
+  }
+  if (error) return <div className="page">{pickers}<ErrorNote error={error} /></div>;
   if (!data) return <div className="page muted">Loading…</div>;
 
   const rows = onlyChanged ? data.rows.filter((r) => r.changed) : data.rows;
@@ -27,6 +59,7 @@ export default function Compare() {
   return (
     <div className="page">
       <h1 className="page-title">How labels changed from {from} to {to}</h1>
+      {pickers}
       <p className="muted">
         {data.postings} postings are labeled under both. <b>{data.changed}</b> changed label or sections.
         {data.changed > 0 && data.from_the_change === data.changed && (

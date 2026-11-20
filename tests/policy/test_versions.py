@@ -208,11 +208,37 @@ async def test_publish_keeps_the_test_labels_and_relabels_the_rest(api, worker):
     assert stale["stale"] is True and stale["policy_version"] == "v1" and stale["relabel_status"] == "queued"
     assert (await label_of(api, "p3"))["policy_version"] == "v2"  # labeled by the Test
 
+    w = (await api.get("/policies/v2/relabel", headers=as_("viewer"))).json()["relabel"]
+    assert (w["kept_from_test"], w["relabeled"], w["waiting"], w["total"]) == (1, 0, 2, 3)
+
     await drain(worker)
     fresh = await label_of(api, "p1")
     assert fresh["stale"] is False and fresh["policy_version"] == "v2"
     progress = (await api.get("/policies/v2/relabel", headers=as_("viewer"))).json()
     assert progress["labels"] == 3 and progress["jobs"] == {"done": 2}
+    assert progress["relabel"] == {
+        "kept_from_test": 1,
+        "relabeled": 2,
+        "in_code": 0,
+        "waiting": 0,
+        "total": 3,
+        "cost_usd": 0.0,
+    }
+    # a posting that arrives after Publish is new, not re-labeled
+    await labeled(api, worker, HIGH_PAY)
+    after = (await api.get("/policies/v2/relabel", headers=as_("viewer"))).json()
+    assert after["new_postings"] == 1 and after["relabel"]["total"] == 3
+
+
+async def test_a_test_of_the_whole_scope_leaves_publish_nothing_to_run(api, worker):
+    await labeled(api, worker, POSTING, CLEAN, IMPERSONATION)
+    await draft(api, "v2", V2)
+    scope = (await api.get("/policies/v2", headers=as_("viewer"))).json()["relabel_scope"]
+    assert scope == 3
+    await run_draft_test(api, worker, "v2", limit=scope)
+    out = (await api.post("/policies/drafts/v2/publish", headers=as_("publisher_b"))).json()
+    assert (out["labeled_by_test"], out["queued"], out["redecided"]) == (3, 0, 0)
+    assert "relabel_scope" not in (await api.get("/policies/v2", headers=as_("viewer"))).json()
 
 
 async def test_an_effects_only_version_relabels_at_no_cost(api, worker, monkeypatch):
@@ -346,3 +372,38 @@ async def test_two_versions_compared_side_by_side(api, worker):
     assert changed["old"]["sections"] == ["§5"] and changed["new"]["sections"] == ["§5", "§6"]
     missing = await api.get("/ui/compare", params={"from": "v1", "to": "v9"}, headers=as_("viewer"))
     assert missing.status_code == 404
+
+
+# ---------------------------------------------------------------- discarding a draft
+
+
+async def test_a_draft_is_discarded_with_its_test_and_its_name_is_free_again(api, worker):
+    await labeled(api, worker, POSTING, CLEAN)
+    await draft(api, "v2", V2)
+    await run_draft_test(api, worker, "v2")
+    assert len(await sql(api, "SELECT id FROM labels WHERE policy_version = 'v2'")) == 2
+    jobs_of_v2 = await sql(api, "SELECT thread_id FROM jobs WHERE policy_version = 'v2'")
+    threads = [t["thread_id"] for t in jobs_of_v2]
+    count = "SELECT count(*) AS n FROM checkpoints WHERE thread_id = ANY(%s)"
+    assert (await sql(api, count, (threads,)))[0]["n"] > 0
+
+    assert (await api.delete("/policies/drafts/v2", headers=as_("viewer"))).status_code == 403
+    out = await api.delete("/policies/drafts/v2", headers=as_("editor"))
+    assert out.status_code == 200 and out.json() == {"discarded": "v2", "labels_deleted": 2}
+    assert await sql(api, "SELECT id FROM labels WHERE policy_version = 'v2'") == []
+    assert await sql(api, "SELECT id FROM jobs WHERE policy_version = 'v2'") == []
+    assert (await sql(api, count, (threads,)))[0]["n"] == 0
+    assert (await api.get("/policies/v2", headers=as_("viewer"))).status_code == 404
+    assert (await draft(api, "v2", V2)).status_code == 201  # the name can be used again
+    assert (await label_of(api, "p1"))["policy_version"] == "v1"  # the live labels are untouched
+
+
+async def test_a_published_version_or_a_running_test_cannot_be_discarded(api, worker):
+    published = await api.delete("/policies/drafts/v1", headers=as_("editor"))
+    assert published.json()["error"]["code"] == "not_a_draft"
+    await labeled(api, worker, POSTING)
+    await draft(api, "v2", V2)
+    await api.post("/policies/drafts/v2/test", headers=as_("editor"))
+    await sql(api, "UPDATE jobs SET status = 'running' WHERE policy_version = 'v2'")
+    refused = await api.delete("/policies/drafts/v2", headers=as_("editor"))
+    assert refused.status_code == 409 and refused.json()["error"]["code"] == "test_running"

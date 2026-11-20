@@ -304,3 +304,14 @@ button.icon:hover { background: var(--soft); border-color: var(--line); color: v
   table.labels { table-layout: auto; }
 }
 .has-tip { border-bottom: 1px dotted var(--muted); cursor: help; }
+
+/* Re-label progress: kept from the Test, then labeled again; the rest is waiting. */
+.relabel { margin: 4px 0 10px; }
+.relabel .bar { display: flex; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0; }
+.relabel .bar .kept { background: var(--allowed); opacity: 0.55; }
+.relabel .bar .done { background: var(--allowed); }
+.relabel p { margin: 0; }
+.relabel.running .bar .done { transition: width 0.4s ease; }
+.discard { margin: -4px 0 12px; }
+.pickers { display: flex; gap: 12px; flex-wrap: wrap; margin: 8px 0 12px; }
+.pickers label { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }

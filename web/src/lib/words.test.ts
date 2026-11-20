@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { field, location, modelName, reason, reasonSentence, stepName } from "./words";
+import { dollars, field, location, modelName, reason, reasonSentence, relabelSentence, stepName } from "./words";
 
 describe("plain words", () => {
   it("puts reason codes into a sentence", () => {
@@ -24,5 +24,23 @@ describe("plain words", () => {
     expect(location("GB, , London")).toBe("GB, London");
     expect(location("US, NY, New York")).toBe("US, NY, New York");
     expect(location(undefined)).toBe("");
+  });
+});
+
+describe("re-label progress", () => {
+  const base = { kept_from_test: 25, relabeled: 40, in_code: 0, waiting: 35, total: 100, cost_usd: 0.16 };
+  it("says what was kept, labeled and is waiting", () => {
+    expect(relabelSentence("v2", base)).toBe(
+      "Labeling recent postings again under v2: 65 of 100 done. 25 kept from the Test, 40 labeled again, 35 waiting. Cost so far $0.16.",
+    );
+  });
+  it("says when it is finished, and what was decided in code", () => {
+    expect(relabelSentence("v4", { ...base, kept_from_test: 0, relabeled: 100, in_code: 100, waiting: 0, cost_usd: 0 })).toBe(
+      "All 100 recent postings are labeled under v4. 0 kept from the Test, 100 labeled again (100 decided in code at $0). Cost $0.00.",
+    );
+  });
+  it("writes small costs plainly", () => {
+    expect(dollars(0.004)).toBe("under $0.01");
+    expect(dollars(0.3)).toBe("$0.30");
   });
 });

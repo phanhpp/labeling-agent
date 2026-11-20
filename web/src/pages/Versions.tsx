@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { api, explain } from "../api";
 import { ErrorNote, useLoad } from "../components/ui";
 import { useShared } from "../context";
@@ -12,6 +12,7 @@ export default function Versions() {
   const { user, refreshVersions } = useShared();
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
+  const notice = (useLocation().state as { message?: string } | null)?.message; // e.g. after discarding a draft
   const live = data?.find((v) => v.status === "live");
   const next = `v${Math.max(0, ...(data ?? []).map((v) => Number(v.name.replace(/\D/g, "")) || 0)) + 1}`;
 
@@ -23,6 +24,7 @@ export default function Versions() {
         recent postings; then a publisher who didn't edit it publishes it.
       </p>
       <ErrorNote error={error} />
+      {notice && <p className="message" role="status">{notice}</p>}
       {message && <p className="error" role="alert">{message}</p>}
       {data && (
         <>

@@ -8,10 +8,11 @@ up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 up-fake:       ## the same, with a fake model: no keys, no cost
 	LLM_BACKEND=fake docker compose up -d --build --wait
 
-demo:          ## a fresh stack with 100 real development postings labeled by Claude (needs keys, about $0.35)
+demo:          ## a fresh stack: 100 real development postings labeled by Claude, and policy v2 as a draft (needs keys, about $0.35)
 	docker compose down -v
 	docker compose up -d --build --wait
 	uv run python -m scripts.submit_postings --split dev --limit 100
+	uv run python -m scripts.demo_draft
 
 demo-draft:    ## load policy v2 (adds §6) as an untested draft, to Test and publish in the UI
 	uv run python -m scripts.demo_draft

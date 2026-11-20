@@ -149,8 +149,12 @@ test("roles on a draft: a viewer reads, an editor submits, an editing publisher 
 
   await actAs(page, "publisher_b");
   await expect(page.getByTestId("flip-report")).toContainText("Test passed.");
+  await expect(page.getByTestId("test-scope")).toContainText("Publish labels the 14 recent postings again");
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByText(/^Published\./)).toBeVisible();
+  // The Test labeled all 14, so Publish kept them and ran nothing.
+  await expect(page.getByTestId("relabel")).toContainText("All 14 recent postings are labeled under v2. 14 kept from the Test, 0 labeled again");
+  await expect(page.getByTestId("relabel-panel")).toContainText("v2: all 14 recent postings re-labeled, 14 kept from the Test");
   // Without reloading the page, the header and the side panel show v2 as latest and live.
   await expect(page.getByTestId("viewing")).toContainText("Showing policy v2 (live)");
   await expect(page.getByRole("button", { name: "Compare v1 → v2" })).toBeEnabled();
@@ -179,4 +183,25 @@ test("the side panel folds, shows an older version without changing what is live
   await expect(rows.first()).toContainText("Senior Pipeline Engineer");
   await page.getByText("Only postings that changed").click();
   await expect(rows).toHaveCount(14);
+
+  // Any two published versions can be picked on the page.
+  await page.getByLabel("Compare from").selectOption("v2");
+  await expect(page.getByText("Choose two different versions.")).toBeVisible();
+  await page.getByLabel("Compare to").selectOption("v1");
+  await expect(page.getByRole("heading", { name: "How labels changed from v2 to v1" })).toBeVisible();
+  await expect(page).toHaveURL(/from=v2&to=v1/);
+});
+
+test("an editor discards a draft; published versions have no discard", async ({ page }) => {
+  await page.goto("/versions");
+  await actAs(page, "editor");
+  await page.getByRole("button", { name: /^Create a draft from v2/ }).click();
+  await expect(page.getByRole("heading", { name: /Policy v3/ })).toBeVisible();
+  await page.getByRole("button", { name: "Discard this draft" }).click();
+  await expect(page.getByText("Discard v3 and its Test? This can't be undone.")).toBeVisible();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(page.getByText("Draft v3 discarded.")).toBeVisible();
+  await expect(page.locator("tr", { hasText: "v3" })).toHaveCount(0);
+  await page.goto("/versions/v2");
+  await expect(page.getByRole("button", { name: "Discard this draft" })).toHaveCount(0);
 });

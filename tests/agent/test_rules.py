@@ -124,13 +124,13 @@ ROWS = [
         ["§2"],
         ["section_unsure"],
     ),
-    ("a suspected injection holds an ALLOWED posting", {}, True, "NEEDS_REVIEW", [], ["injection"]),
+    ("a suspected injection is held for review", {}, True, "NEEDS_REVIEW", [], ["injection"]),
     (
-        "a suspected injection keeps VIOLATING and adds the reason",
+        "a suspected injection is held for review even with a matched section",
         {"§1": matched(FEE)},
         True,
-        "VIOLATING",
-        ["§1"],
+        "NEEDS_REVIEW",
+        [],
         ["injection"],
     ),
     (

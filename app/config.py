@@ -26,7 +26,11 @@ PRICES = {
 MODEL_TIMEOUT_S = 25  # per call; with one retry the worst case stays inside the 90 s job limit
 MODEL_MAX_RETRIES = 1
 JEV_TIMEOUT_S = 5  # Jev usually answers in under a second; 3 tries stay under 20 s
-INJECTION_THRESHOLD = 0.5  # a Jev injection score at or above this sets the injection flag
+# A Jev injection score at or above this sends the posting to review, and no model labels it.
+# Fitted by scripts/fit_injection.py (2026-11-20): the lowest threshold that flags at most 0.1% of
+# ordinary postings. It flags 3 of 3,852 and catches 100% of 540 injected postings, held-out
+# wording included (eval/runs/injection-fit/summary.json).
+INJECTION_THRESHOLD = 0.5
 
 
 def database_url() -> str:

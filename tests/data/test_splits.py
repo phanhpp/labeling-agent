@@ -2,13 +2,10 @@
 the last one recomputes it from the CSV and needs the dataset (marker `data`)."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from scripts.load_data import SPLITS, make_splits, read_eval_ids
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(scope="module")

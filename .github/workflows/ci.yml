@@ -54,7 +54,9 @@ jobs:
       # --no-dev installs exactly what the Docker image will install, so an import that only works
       # because a dev tool pulled a package in fails here.
       - name: Import check with runtime packages only
-        run: uv run --no-dev --frozen python -c "import app.config, app.db, app.dataset, app.policy, scripts.load_data"
+        run: >-
+          uv run --no-dev --frozen python -c "import app.config, app.db, app.dataset, app.policy,
+          app.agent.clean, app.agent.quotes, app.agent.check, app.agent.decide, app.agent.cache, scripts.load_data"
 
       - run: uv sync --frozen
 

@@ -100,3 +100,26 @@ describe("paging", () => {
     expect(toggle({ page: 4 }, "label", "ALLOWED")).toEqual({ label: "ALLOWED" });
   });
 });
+
+describe("version tags", async () => {
+  const { tagVersions } = await import("../context");
+  const v = (name: string, status: string, published_at: string | null) => ({ name, status, published_at }) as any;
+
+  it("tags the newest published as latest, the one before as previous, and the live one", () => {
+    const tagged = tagVersions([
+      v("v1", "retired", "2026-11-20T01:00:00Z"),
+      v("v2", "live", "2026-11-20T02:00:00Z"),
+      v("v3", "draft", null),
+    ]);
+    expect(tagged.map((t) => [t.name, t.tags])).toEqual([
+      ["v1", ["previous"]],
+      ["v2", ["latest", "live"]],
+      ["v3", []],
+    ]);
+  });
+
+  it("after a rollback, live and latest are different versions", () => {
+    const tagged = tagVersions([v("v1", "live", "2026-11-20T01:00:00Z"), v("v2", "retired", "2026-11-20T02:00:00Z")]);
+    expect(tagged.map((t) => t.tags)).toEqual([["previous", "live"], ["latest"]]);
+  });
+});

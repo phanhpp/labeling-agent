@@ -2,17 +2,18 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes } from "react-router";
 import { api } from "./api";
+import { SidePanel } from "./components/SidePanel";
 import { useLoad } from "./components/ui";
 import { SharedProvider, useShared } from "./context";
 import Browse from "./pages/Browse";
+import Compare from "./pages/Compare";
 import Decision from "./pages/Decision";
 import Version from "./pages/Version";
 import Versions from "./pages/Versions";
-import { USERS } from "./roles";
 import "./styles.css";
 
 function Header() {
-  const { user, setUser, live } = useShared();
+  const { user, live, viewing, panelOpen, setPanelOpen } = useShared();
   const health = useLoad(api.health, []);
   return (
     <>
@@ -22,19 +23,18 @@ function Header() {
           <NavLink to="/" end>Labels</NavLink>
           <NavLink to="/versions">Versions</NavLink>
         </nav>
-        {live && <span className="pill">Live policy <b>{live}</b></span>}
-        <label className="acting">
-          Acting as{" "}
-          <select
-            aria-label="Acting as"
-            value={user.key}
-            onChange={(e) => setUser(USERS.find((u) => u.key === e.target.value)!)}
-          >
-            {USERS.map((u) => (
-              <option key={u.key} value={u.key}>{u.name}, {u.role} ({u.can})</option>
-            ))}
-          </select>
-        </label>
+        {live && (
+          <span className="viewing" data-testid="viewing">
+            Showing policy <b>{viewing ?? live}</b>
+            {viewing ? <> · live is <b>{live}</b></> : " (live)"}
+          </span>
+        )}
+        <span className="acting">
+          <button className="whoami" onClick={() => setPanelOpen(true)} title="Change who you are in the side panel">
+            <b>{user.name}</b> · {user.role}
+          </button>
+          {!panelOpen && <button className="small" onClick={() => setPanelOpen(true)}>‹ Panel</button>}
+        </span>
       </header>
       {health.data?.llm_backend === "fake" && (
         <div className="banner sample" role="status">
@@ -51,18 +51,22 @@ function Header() {
 }
 
 function App() {
-  const { user } = useShared();
+  const { user, viewing, panelOpen } = useShared();
   return (
     <>
       <Header />
-      {/* key: switching user reloads the page's data with the new role */}
-      <Routes key={user.key}>
-        <Route path="/" element={<Browse />} />
-        <Route path="/labels/:id" element={<Decision />} />
-        <Route path="/versions" element={<Versions />} />
-        <Route path="/versions/:name" element={<Version />} />
-        <Route path="*" element={<p className="page">Page not found.</p>} />
-      </Routes>
+      <div className={`layout ${panelOpen ? "" : "folded"}`}>
+        {/* key: switching user or version reloads the page's data */}
+        <Routes key={`${user.key}-${viewing ?? "live"}`}>
+          <Route path="/" element={<Browse />} />
+          <Route path="/labels/:id" element={<Decision />} />
+          <Route path="/versions" element={<Versions />} />
+          <Route path="/versions/:name" element={<Version />} />
+          <Route path="/compare" element={<Compare />} />
+          <Route path="*" element={<p className="page">Page not found.</p>} />
+        </Routes>
+        {panelOpen && <SidePanel />}
+      </div>
     </>
   );
 }

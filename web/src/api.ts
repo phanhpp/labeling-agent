@@ -60,7 +60,13 @@ export type Steps = { job: { status: string; checkpoints_pruned: boolean } | nul
 export type Version = {
   name: string; status: "draft" | "live" | "retired"; parent: string | null; author: string; edited_by: string[];
   published_by: string | null; published_at: string | null; tested: boolean; created_at: string;
+  submitted_by: string | null; submitted_at: string | null;
 };
+export type CompareRow = {
+  posting_id: number; job_id: string; title: string; changed: boolean; from_the_change: boolean;
+  old: { label_id: number; label: string; sections: string[] }; new: { label_id: number; label: string; sections: string[] };
+};
+export type Comparison = { old: string; new: string; postings: number; changed: number; from_the_change: number; rows: CompareRow[] };
 export type Policy = Version & { body: any; diff?: { against: string; changes: { where: string; change: string; models_see_it: boolean }[] } };
 export type Flip = { job_id: string; label_id: number; before: { label: string; sections: string[] }; after: { label: string; sections: string[] }; from_the_change: boolean };
 export type Report = {
@@ -85,7 +91,10 @@ export const api = {
   version: (name: string, diff?: string | null) => request<Policy>(`/policies/${name}${diff ? `?diff=${diff}` : ""}`),
   createDraft: (name: string) => request<Version>("/policies/drafts", json("POST", { name })),
   saveDraft: (name: string, body: any) => request<Version>(`/policies/drafts/${name}`, json("PUT", { body })),
-  startTest: (name: string) => request(`/policies/drafts/${name}/test`, json("POST")),
+  startTest: (name: string, limit = 100) => request(`/policies/drafts/${name}/test?limit=${limit}`, json("POST")),
+  stopTest: (name: string) => request<{ dropped: number }>(`/policies/drafts/${name}/test/stop`, json("POST")),
+  submit: (name: string) => request<Version>(`/policies/drafts/${name}/submit`, json("POST")),
+  compare: (from: string, to: string) => request<Comparison>(`/ui/compare?from=${from}&to=${to}`),
   report: (name: string) => request<Report>(`/policies/drafts/${name}/test`),
   publish: (name: string) => request<{ mode: string; queued: number; redecided: number }>(`/policies/drafts/${name}/publish`, json("POST")),
   rollback: (name: string) => request(`/policies/live`, json("PUT", { name })),

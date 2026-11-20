@@ -303,3 +303,46 @@ def test_a_flip_is_from_the_change_only_if_it_involves_a_changed_section():
     assert _from_the_change(row(["§5"], ["§5", "§6"]), {"§6"})  # §6 appeared
     assert not _from_the_change(row([], ["§5"], ("ALLOWED", "NEEDS_REVIEW")), {"§6"})  # model variation
     assert _from_the_change(row(["§4"], ["§4"], ("VIOLATING", "NEEDS_REVIEW")), {"§4"})  # an effect change
+
+
+async def test_submit_needs_a_passing_test_and_an_edit_clears_it(api, worker):
+    await labeled(api, worker, POSTING)
+    await draft(api, "v2", V2)
+
+    async def submit(user="editor"):
+        return await api.post("/policies/drafts/v2/submit", headers=as_(user))
+
+    assert (await submit("viewer")).status_code == 403
+    assert (await submit()).json()["error"]["code"] == "test_outdated"
+    await run_draft_test(api, worker, "v2")
+    done = (await submit()).json()
+    assert done["submitted_by"] == "eddie" and done["submitted_at"]
+    edited = {**V2, "title": "Recruitment fraud policy (edited)"}
+    after_edit = (await api.put("/policies/drafts/v2", json={"body": edited}, headers=as_("editor"))).json()
+    assert after_edit["submitted_by"] is None  # a publisher approves what they see
+
+
+async def test_a_test_can_be_stopped(api, worker):
+    await labeled(api, worker, POSTING, CLEAN, IMPERSONATION)
+    await draft(api, "v2", V2)
+    await api.post("/policies/drafts/v2/test", headers=as_("editor"))
+    stopped = (await api.post("/policies/drafts/v2/test/stop", headers=as_("editor"))).json()
+    assert stopped == {"version": "v2", "dropped": 3}
+    assert await sql(api, "SELECT id FROM jobs WHERE policy_version = 'v2'") == []
+    report = (await api.get("/policies/drafts/v2/test", headers=as_("viewer"))).json()
+    assert report["labeled"] == 0 and not report["passed"]  # nothing labeled: nothing to publish on
+    assert (await api.post("/policies/drafts/v2/test/stop", headers=as_("viewer"))).status_code == 403
+
+
+async def test_two_versions_compared_side_by_side(api, worker):
+    await labeled(api, worker, POSTING, CLEAN, IMPERSONATION)
+    await draft(api, "v2", V2)
+    await run_draft_test(api, worker, "v2")
+    await api.post("/policies/drafts/v2/publish", headers=as_("publisher_b"))
+    out = (await api.get("/ui/compare", params={"from": "v1", "to": "v2"}, headers=as_("viewer"))).json()
+    assert (out["postings"], out["changed"], out["from_the_change"]) == (3, 1, 1)
+    [changed] = [r for r in out["rows"] if r["changed"]]
+    assert changed["job_id"] == "p3"
+    assert changed["old"]["sections"] == ["§5"] and changed["new"]["sections"] == ["§5", "§6"]
+    missing = await api.get("/ui/compare", params={"from": "v1", "to": "v9"}, headers=as_("viewer"))
+    assert missing.status_code == 404

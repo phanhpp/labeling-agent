@@ -6,6 +6,7 @@ import { useShared } from "../context";
 
 export default function Version() {
   const { name = "" } = useParams();
+  const { user } = useShared();
   // Kept here, not in the panels: publishing turns the draft panel into the live one.
   const [message, setMessage] = useState("");
   const { data, error, reload } = useLoad(async () => {
@@ -30,7 +31,7 @@ export default function Version() {
       {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={reload} />}
       {data.diff && <Changes policy={data} />}
       {isDraft && <DraftTools policy={data} onChange={reload} notify={setMessage} />}
-      {isDraft ? <Editor policy={data} onSaved={reload} notify={setMessage} /> : <PolicyText policy={data} />}
+      {isDraft && user.role !== "viewer" ? <Editor policy={data} onSaved={reload} notify={setMessage} /> : <PolicyText policy={data} />}
     </div>
   );
 }
@@ -50,9 +51,11 @@ function DraftGuide({ policy }: { policy: Policy }) {
         <b>2. Test</b>
         Labels recent postings under this draft, without changing anything anyone sees, and lists what would change.
       </li>
-      <li>
-        <b>3. Publish</b>
-        A publisher who did not edit the draft makes it live. Recent postings are then labeled again.
+      <li className={policy.submitted_by ? "done" : ""}>
+        <b>3. Submit, then publish</b>
+        {policy.submitted_by
+          ? `Submitted by ${policy.submitted_by}. Waiting for a publisher who didn't edit it.`
+          : "An editor submits it; a publisher who did not edit it publishes it. Recent postings are then labeled again."}
       </li>
     </ol>
   );
@@ -132,21 +135,25 @@ function Changes({ policy }: { policy: Policy }) {
   );
 }
 
-// Test and Publish. The buttons are there for every role: the API decides who may, and its answer
-// is shown (that is the role demo).
+const TEST_SIZES = [25, 50, 100, 200];
+
+// Test, Submit and Publish, each shown to the roles that may use it, with the reason when it can't
+// be used yet. The API checks every rule again.
 function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: () => void; notify: (m: string) => void }) {
+  const { user } = useShared();
   const [report, setReport] = useState<Report | null>(null);
   const [polls, setPolls] = useState(0);
+  const [size, setSize] = useState(100);
 
   useEffect(() => {
     api.report(policy.name).then(setReport, () => setReport(null));
   }, [policy.name, polls]);
+  const running = (report?.jobs.queued ?? 0) + (report?.jobs.running ?? 0);
   useEffect(() => {
-    const running = report && (report.jobs.queued || report.jobs.running);
     if (!running) return;
     const timer = setTimeout(() => setPolls((n) => n + 1), 1000);
     return () => clearTimeout(timer);
-  }, [report]);
+  }, [report, running]);
 
   const act = (action: () => Promise<unknown>, done: string) =>
     action().then(
@@ -154,17 +161,53 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
       (err) => notify(explain(err)),
     );
 
+  const canEdit = user.role !== "viewer";
+  const passed = !!report?.passed && policy.tested;
+  const edited = policy.edited_by.includes(user.name.toLowerCase());
+  const publishBlocked = !passed ? "Test this draft first, and let the Test finish." : edited ? "You edited this draft, so another publisher has to publish it." : "";
+
   return (
     <section className="card">
       <h2 className="card-title">Test and publish</h2>
-      <div className="buttons">
-        <button onClick={() => act(() => api.startTest(policy.name), "Test started: recent postings are being labeled under this draft.")}>Test this draft</button>
-        <button className="primary" onClick={() => act(() => api.publish(policy.name), "Published. Recent postings are being labeled again.")}>Publish</button>
-      </div>
-      {report && report.labeled + (report.jobs.queued ?? 0) + (report.jobs.running ?? 0) > 0 ? (
+      {canEdit ? (
+        <div className="buttons">
+          <label className="buttons">
+            Test on
+            <select className="small" aria-label="How many postings to test" value={size} onChange={(e) => setSize(Number(e.target.value))}>
+              {TEST_SIZES.map((n) => <option key={n} value={n}>{n} recent postings</option>)}
+            </select>
+          </label>
+          {running ? (
+            <button onClick={() => act(() => api.stopTest(policy.name), "Test stopped. It stands on the postings labeled so far.")}>Stop the test</button>
+          ) : (
+            <button onClick={() => act(() => api.startTest(policy.name, size), `Test started on up to ${size} recent postings.`)}>Test this draft</button>
+          )}
+          {user.role === "editor" && (
+            <button
+              className="primary"
+              disabled={!passed || !!policy.submitted_by}
+              onClick={() => act(() => api.submit(policy.name), "Submitted. A publisher needs to publish it.")}
+            >
+              {policy.submitted_by ? "Submitted" : "Submit for publishing"}
+            </button>
+          )}
+          {user.role === "publisher" && (
+            <button className="primary" disabled={!!publishBlocked} title={publishBlocked}
+              onClick={() => act(() => api.publish(policy.name), "Published. Recent postings are being labeled again.")}>
+              Publish
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="hint">Viewers can read drafts and their Test. Editors test and submit; publishers publish.</p>
+      )}
+      {user.role === "editor" && !passed && <p className="hint">Submit needs a finished, passing Test of the current draft.</p>}
+      {user.role === "publisher" && publishBlocked && <p className="hint" data-testid="publish-blocked">{publishBlocked}</p>}
+      {policy.submitted_by && <p className="hint">Submitted by {policy.submitted_by}{policy.submitted_at ? `, ${new Date(policy.submitted_at).toLocaleString()}` : ""}.</p>}
+      {report && report.labeled + running > 0 ? (
         <FlipReport report={report} />
       ) : (
-        <p className="hint">Not tested yet. Publish needs a Test of the current draft.</p>
+        <p className="hint">Not tested yet.</p>
       )}
     </section>
   );
@@ -178,8 +221,10 @@ function FlipReport({ report }: { report: Report }) {
         <b>{report.passed ? "Test passed." : running ? `Test running: ${running} postings left.` : "Test not passed."}</b>{" "}
         {report.labeled} recent postings labeled under this draft (
         {report.mode === "redecide" ? "decided again in code, no model calls" : `${report.model_calls} model runs`}, $
-        {report.cost_usd.toFixed(4)}). Compared with {report.compared_with}, {report.flips.length} would change
-        {report.flips.length > 0 && <>; {report.flips_from_the_change} of them because of a section this draft changed</>}.
+        {report.cost_usd.toFixed(4)}). Compared with {report.compared_with}, <b>{report.flips.length}</b> would change.
+        {report.flips.length > report.flips_from_the_change && (
+          <> {report.flips.length - report.flips_from_the_change} of these don't involve an edited section: that's Claude answering differently when asked again.</>
+        )}
       </p>
       <ul className="invariants">
         {report.invariants.map((i) => (
@@ -188,14 +233,13 @@ function FlipReport({ report }: { report: Report }) {
       </ul>
       {report.flips.length > 0 && (
         <table className="flips">
-          <thead><tr><th>Job</th><th>Now</th><th>Under this draft</th><th>Why it changed</th></tr></thead>
+          <thead><tr><th>Job</th><th>Label under {report.compared_with} (live)</th><th>Label under this draft ({report.version})</th></tr></thead>
           <tbody>
             {report.flips.map((f) => (
               <tr key={f.label_id}>
                 <td><Link className="mono" to={`/labels/${f.label_id}`}>{f.job_id}</Link></td>
                 <td><LabelBadge label={f.before.label} /> {f.before.sections.map((s) => <SectionTag key={s} code={s} />)}</td>
                 <td><LabelBadge label={f.after.label} /> {f.after.sections.map((s) => <SectionTag key={s} code={s} />)}</td>
-                <td className="muted small">{f.from_the_change ? "a section this draft changed" : "the model answered differently"}</td>
               </tr>
             ))}
           </tbody>
@@ -287,13 +331,14 @@ function Editor({ policy, onSaved, notify }: { policy: Policy; onSaved: () => vo
   const [body, setBody] = useState(() => structuredClone(policy.body));
   const { user } = useShared();
   const { open, toggleAll, toggleOne } = useOpenAll(body.sections.length);
+  const [removing, setRemoving] = useState<number | null>(null);
   useEffect(() => setBody(structuredClone(policy.body)), [policy]);
 
   const setSection = (i: number, update: (s: any) => void) =>
     setBody((b: any) => { const next = structuredClone(b); update(next.sections[i]); return next; });
   const save = () =>
     api.saveDraft(policy.name, body).then(
-      () => { notify("Saved. Run Test again before publishing."); onSaved(); },
+      () => { notify("Saved. Test it again, then submit it for publishing."); onSaved(); },
       (e) => notify(explain(e)),
     );
 
@@ -326,7 +371,7 @@ function Editor({ policy, onSaved, notify }: { policy: Policy; onSaved: () => vo
               <label className="block grow"><span>Title</span>
                 <input aria-label={`${s.code} title`} value={s.title} onChange={(e) => setSection(i, (x) => (x.title = e.target.value))} />
               </label>
-              <label className="block"><span>If it matches</span>
+              <label className="block"><span>Label if it matches</span>
                 <select aria-label={`${s.code} effect`} value={s.effect} onChange={(e) => setSection(i, (x) => (x.effect = e.target.value))}>
                   <option value="VIOLATING">VIOLATING</option>
                   <option value="NEEDS_REVIEW">NEEDS_REVIEW</option>
@@ -342,14 +387,23 @@ function Editor({ policy, onSaved, notify }: { policy: Policy; onSaved: () => vo
             {s.examples.map((ex: any, j: number) => (
               <div className="row" key={j}>
                 <label className="block"><span>Example {j + 1}</span>
-                  <select aria-label="Example matches" value={String(ex.matches)} onChange={(e) => setSection(i, (x) => (x.examples[j].matches = e.target.value === "true"))}>
-                    <option value="true">matches</option>
-                    <option value="false">doesn't match</option>
+                  <select className="strong" aria-label="Example matches" value={String(ex.matches)} onChange={(e) => setSection(i, (x) => (x.examples[j].matches = e.target.value === "true"))}>
+                    <option value="true">MATCHES</option>
+                    <option value="false">DOESN'T MATCH</option>
                   </select>
                 </label>
                 <div className="grow"><AutoText label="Example text" value={ex.text} onChange={(v) => setSection(i, (x) => (x.examples[j].text = v))} minRows={1} /></div>
               </div>
             ))}
+            {removing === i ? (
+              <span className="confirm">
+                Remove {s.code} from this draft?
+                <button className="small" type="button" onClick={() => { setBody((b: any) => ({ ...b, sections: b.sections.filter((_: any, k: number) => k !== i) })); setRemoving(null); }}>Remove</button>
+                <button className="small" type="button" onClick={() => setRemoving(null)}>Keep it</button>
+              </span>
+            ) : (
+              <button className="small" type="button" onClick={() => setRemoving(i)}>Remove this section</button>
+            )}
           </div>
         </details>
       ))}

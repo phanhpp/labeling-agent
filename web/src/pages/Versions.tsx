@@ -48,7 +48,8 @@ export default function Versions() {
                     <td><Link className="mono" to={`/versions/${v.name}`}>{v.name}</Link></td>
                     <td>
                       <span className={`status ${v.status}`}>{v.status}</span>
-                      {v.status === "draft" && <span className="muted small"> · {v.tested ? "tested" : "not tested yet"}</span>}
+                      {v.status === "draft" && v.submitted_by && <> <span className="status submitted">waiting for a publisher</span></>}
+                      {v.status === "draft" && !v.submitted_by && <span className="muted small"> · {v.tested ? "tested" : "not tested yet"}</span>}
                     </td>
                     <td className="mono">{v.parent ?? ""}</td>
                     <td>{person(v.author)}</td>

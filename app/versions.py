@@ -80,10 +80,11 @@ async def update_draft(conn: AsyncConnection, name: str, body: dict, editor: str
         " finished_at = now() WHERE policy_version = %s AND status = 'queued'",
         (name,),
     )
+    # An edit takes the draft back to "not submitted": a publisher approves what they see.
     return await (
         await conn.execute(
-            "UPDATE policy_versions SET body = %s, content_hash = %s, model_hash = %s, edited_by = %s"
-            " WHERE name = %s RETURNING *",
+            "UPDATE policy_versions SET body = %s, content_hash = %s, model_hash = %s, edited_by = %s,"
+            " submitted_by = NULL, submitted_at = NULL WHERE name = %s RETURNING *",
             (Jsonb(body), policies.content_hash(body), policies.model_hash(body), edited_by, name),
         )
     ).fetchone()
@@ -206,6 +207,94 @@ def _invariants(draft: dict, jobs: dict, rows: list[dict]) -> list[dict]:
             "passed": all(r["evidence"] for r in rows if r["label"] == "VIOLATING"),
         },
     ]
+
+
+async def stop_test(conn: AsyncConnection, name: str) -> dict:
+    """Stop a Test: its queued postings are dropped; any being labeled now finish. The Test then
+    stands on the postings it labeled."""
+    draft = await _draft(conn, name)
+    dropped = await (
+        await conn.execute(
+            "DELETE FROM jobs WHERE policy_version = %s AND policy_hash = %s AND queue = 'shadow'"
+            " AND status = 'queued' RETURNING id",
+            (name, draft["content_hash"]),
+        )
+    ).fetchall()
+    return {"version": name, "dropped": len(dropped)}
+
+
+async def submit(conn: AsyncConnection, name: str, editor: str) -> dict:
+    """Mark a draft ready for a publisher. It needs a finished, passing Test of its current content."""
+    draft = await _draft(conn, name)
+    if draft["tested_hash"] != draft["content_hash"]:
+        raise Refused(409, "test_outdated", "Test this draft first")
+    report = await test_report(conn, name)
+    if not report["passed"]:
+        raise Refused(409, "test_not_passed", [i for i in report["invariants"] if not i["passed"]])
+    return await (
+        await conn.execute(
+            "UPDATE policy_versions SET submitted_by = %s, submitted_at = now() WHERE name = %s RETURNING *",
+            (editor, name),
+        )
+    ).fetchone()
+
+
+async def compare(conn: AsyncConnection, old: str, new: str) -> dict:
+    """Every posting labeled under both versions, side by side: did its label or sections change, and
+    does the change involve a section that differs between the two versions (or is it the model
+    answering differently)?"""
+    versions = {}
+    for name in (old, new):
+        versions[name] = await store.policy_version(conn, name)
+        if versions[name] is None:
+            raise Refused(404, "not_found")
+    changed_codes = {
+        c["where"].split(".")[0] for c in policies.diff(versions[old]["body"], versions[new]["body"])
+    }
+    rows = await (
+        await conn.execute(
+            """
+            WITH a AS (SELECT DISTINCT ON (posting_id) * FROM labels WHERE policy_version = %(old)s
+                       ORDER BY posting_id, created_at DESC),
+                 b AS (SELECT DISTINCT ON (posting_id) * FROM labels WHERE policy_version = %(new)s
+                       ORDER BY posting_id, created_at DESC)
+            SELECT p.id AS posting_id, p.job_id, p.raw->>'title' AS title,
+                   a.id AS old_id, a.label AS old_label, a.sections AS old_sections,
+                   b.id AS new_id, b.label AS new_label, b.sections AS new_sections
+            FROM a JOIN b ON b.posting_id = a.posting_id JOIN postings p ON p.id = a.posting_id
+            ORDER BY b.created_at DESC, p.id DESC
+            """,
+            {"old": old, "new": new},
+        )
+    ).fetchall()
+    out = []
+    for r in rows:
+        changed = r["old_label"] != r["new_label"] or r["old_sections"] != r["new_sections"]
+        same_shape = {
+            "live_sections": r["old_sections"],
+            "sections": r["new_sections"],
+            "live_label": r["old_label"],
+            "label": r["new_label"],
+        }
+        out.append(
+            {
+                "posting_id": r["posting_id"],
+                "job_id": r["job_id"],
+                "title": r["title"],
+                "old": {"label_id": r["old_id"], "label": r["old_label"], "sections": r["old_sections"]},
+                "new": {"label_id": r["new_id"], "label": r["new_label"], "sections": r["new_sections"]},
+                "changed": changed,
+                "from_the_change": changed and _from_the_change(same_shape, changed_codes),
+            }
+        )
+    return {
+        "old": old,
+        "new": new,
+        "postings": len(out),
+        "changed": sum(r["changed"] for r in out),
+        "from_the_change": sum(r["from_the_change"] for r in out),
+        "rows": out,
+    }
 
 
 # ---------------------------------------------------------------- Publish, re-label, rollback

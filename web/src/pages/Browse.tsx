@@ -11,9 +11,9 @@ import { field } from "../lib/words";
 export default function Browse() {
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
-  const { sections } = useShared();
+  const { sections, viewing } = useShared();
   const navigate = useNavigate();
-  const { data, error } = useLoad(() => api.labels(filters), [params.toString()]);
+  const { data, error } = useLoad(() => api.labels({ ...filters, version: filters.version ?? viewing ?? undefined }), [params.toString(), viewing]);
   const set = (next: Filters) => setParams(toParams(next));
 
   // Remember this page of the list, so the decision page can go back to it and step through it.

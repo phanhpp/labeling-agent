@@ -1,4 +1,19 @@
-# One command: docker compose up. Phase 1 has only the database; later phases add api and worker.
+# One command: cp .env.example .env && docker compose up --wait
+# Then the API and UI are on http://localhost:8000 (API docs at /docs).
+#
+# db      Postgres 16: postings, jobs, labels, policy versions, LangGraph checkpoints
+# api     FastAPI: creates the tables and inserts policy v1 at startup, then serves /v1, /ui and the UI
+# worker  takes jobs and runs the agent; starts once the api is healthy (only the api creates tables)
+
+x-app: &app
+  build: .
+  image: labeling-agent
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql://labeler:labeler@db:5432/labeler
+
 services:
   db:
     image: postgres:16
@@ -15,6 +30,27 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  api:
+    <<: *app
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  worker:
+    <<: *app
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    stop_grace_period: 100s  # lets a running job finish (the job limit is 90 s)
 
 volumes:
   db-data:

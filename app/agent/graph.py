@@ -22,6 +22,7 @@ from app.agent.escalate import PROMPT_VERSION, escalate, render_posting
 from app.agent.models import Finding, RawAnswer
 from app.agent.screen import run_screen
 from app.agent.state import Context, State
+from app.config import llm_backend
 
 
 def _cleaned(state: State) -> Cleaned:
@@ -42,7 +43,7 @@ async def cache_node(state: State, runtime: Runtime[Context]) -> dict:
         state["model_input"],
         policies.content_hash(ctx.policy),
         f"{AGENT_VERSION}/{PROMPT_VERSION}",
-        {"escalate": ctx.config.model, "screen": ctx.config.screen},
+        {"escalate": ctx.config.model, "screen": ctx.config.screen, "backend": llm_backend()},
         {"hints": ctx.config.hints, **ctx.config.screen_settings},
     )
     if ctx.config.cache and ctx.cache_lookup is not None:
@@ -142,8 +143,10 @@ def build(checkpointer=None):
 
 
 def model_version(config) -> str:
-    """Which code and models made a label: part of the labels table's key."""
+    """Which code and models made a label: part of the labels table's key. Labels from the fake
+    backend say so, and the backend is in the cache key too, so a fake label is never reused."""
+    fake = "fake;" if llm_backend() == "fake" else ""
     return (
-        f"{config.name};escalate={config.model};screen={config.screen};"
+        f"{fake}{config.name};escalate={config.model};screen={config.screen};"
         f"agent={AGENT_VERSION};prompt={PROMPT_VERSION}"
     )

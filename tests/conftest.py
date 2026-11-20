@@ -29,3 +29,39 @@ def fresh_db_url():
     finally:
         admin.execute(f'DROP DATABASE "{name}" WITH (FORCE)')
         admin.close()
+
+
+@pytest.fixture
+async def api(fresh_db_url, monkeypatch):
+    """The API app on a fresh database, started (tables, checkpoints, policy v1), with an httpx client.
+    Model calls use the fake labeler. The app is on client.app."""
+    import httpx
+
+    from app import auth
+    from app.agent.fake_models import FakeLabeler
+    from app.api.main import create_app
+
+    monkeypatch.setenv("LLM_BACKEND", "fake")
+    monkeypatch.setattr("app.agent.llm.chat", lambda profile: FakeLabeler(profile))
+    auth._windows.clear()
+    app = create_app(fresh_db_url)
+    async with app.router.lifespan_context(app):
+        # raise_app_exceptions=False: a crash comes back as the app's 500, as a real client sees it.
+        transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            client.app = app
+            yield client
+
+
+@pytest.fixture
+async def worker(api, fresh_db_url):
+    """A worker on the same database, labeling with sonnet_only (the fake backend has no fake Jev)."""
+    from app.agent import checkpoints
+    from app.agent.configs import CONFIGS
+    from app.worker import Worker
+
+    saver, saver_pool = await checkpoints.open_checkpointer(fresh_db_url, max_size=4)
+    try:
+        yield Worker(api.app.state.pool, saver, CONFIGS["sonnet_only"], concurrency=4)
+    finally:
+        await saver_pool.close()

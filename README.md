@@ -129,6 +129,20 @@ After `make demo`, at http://localhost:8000:
 3. **Change the policy:** open Versions, then draft v2 (adds §6). As Eddie, Test it and Submit; as Sam (publisher), Publish. When the re-label is done, "Compare v1 → v2" shows what changed.
 4. **New postings follow the new policy:** send a few more; they are labeled under v2 at once.
 
+## Your data
+
+**The local database.** The app keeps its data in a Postgres database in Docker on your machine: the postings it was sent, their labels under each policy version, the policy versions and drafts, analysts' decisions, the job queue and each run's saved steps. `make down` keeps it; `make reset` deletes it, so the next start is empty with policy v1. The dataset file and the eval results are never stored there.
+
+**How the dataset is split** (17,880 postings, about 5% fraud; recorded in `data/splits.json`):
+
+| Part | Size | Used for |
+| --- | --- | --- |
+| Test set | 400, 100 fraud | The reported results only. Never used for tuning, and never sent to the app |
+| Copies of the test set | 586 | Excluded everywhere: the same ad under another id would leak the test into tuning |
+| Development set | 300, 75 fraud | Tuning prompts and comparing set-ups; `make demo` sends 100 of them |
+| Jev fitting set | 3,552 | Setting Jev's two thresholds |
+| The rest | 13,042 | Not used for tuning. The live demo and the load test draw from every posting outside the test set and its copies |
+
 ## How it's tested
 
 - **Code:** 269 Python tests (API, agent, queue, policy versions, data; the models are faked), 25 UI unit tests and 17 browser tests, on every pull request.
@@ -165,23 +179,6 @@ make results         # rebuild RESULTS.md from the saved runs
 | Webhooks, gradual rollout, online judges, alerts, spend cap | Not built: described in DESIGN.md |
 
 ## Where things are
-
-```mermaid
-flowchart LR
-  MK[Marketplace] -->|/v1| IN[app/api/intake.py]
-  UI[web/src: the React UI] -->|/ui, /policies| AN[app/api/analyst.py<br/>policies.py, demo.py]
-  IN --> ST[app/store.py: all SQL]
-  AN --> ST
-  AN --> VR[app/versions.py<br/>drafts, Test, Publish]
-  VR --> ST
-  ST --> DB[(Postgres<br/>app/schema.sql)]
-  DB -->|jobs| WK[app/worker.py<br/>app/queue.py]
-  WK --> AG[app/agent/graph.py]
-  AG --> M[Jev and Claude<br/>app/agent/llm.py]
-  WK -->|labels| DB
-  EV[eval/run_eval.py] --> AG
-  EV --> RUNS[eval/runs] --> REP[eval/report.py] --> RES[RESULTS.md]
-```
 
 | Folder | What it is for | Key files |
 | --- | --- | --- |

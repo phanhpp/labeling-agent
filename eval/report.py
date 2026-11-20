@@ -122,60 +122,58 @@ def build() -> str:
     }
     dev = {name: summary(f"dev300-{name}") for name in ("jev_sonnet", "sonnet_only", "haiku_sonnet")}
 
-    m1 = v1s["main"]
+    m1, m2 = v1s["main"], v2s["main"]
+    c1 = v1s["confusion"]
     out: list[str] = []
     w = out.append
+    peak16, burst16 = summary("load-peak-16"), summary("load-burst-16")
+    peak48, burst48 = summary("load-peak-48"), summary("load-burst-48")
+    load_cost = sum(r["cost_usd"] for r in (peak16, burst16, peak48, burst48))
+    sonnet_ratio = dev["sonnet_only"]["cost_per_1000_usd"] / dev["jev_sonnet"]["cost_per_1000_usd"]
 
     w("# Results")
     w("")
     w(
-        "The labeling agent on the 400 evaluation postings: the fixed test set, 100 fraud and 300 legitimate, "
-        "kept apart from all tuning. Each number below is computed by `eval/report.py` from the run files in "
-        "`eval/runs/`; `uv run python -m eval.report --check` fails if this page and the runs disagree."
+        "How the labeling agent performs on the 400 test postings the assignment fixes (100 fraud, 300 legitimate), "
+        "which were never used for tuning. Every number is computed by `eval/report.py` from the saved runs in "
+        "`eval/runs/`; `make results` fails if this page and the runs disagree."
     )
     w("")
+    w("**In short**")
+    w("")
     w(
-        "**In short.** Under the brief's policy (v1) the agent flags "
-        f"{m1['tp']} of 100 fraud postings ({m1['tp'] - v1s['confusion']['fraud']['VIOLATING']} for an analyst, "
-        f"{v1s['confusion']['fraud']['VIOLATING']} as VIOLATING) and never labels a legitimate posting VIOLATING. "
-        f"It sends {pct(v1s['review_load'])} of postings to an analyst and costs "
-        f"${cost_reweighted(v1):.2f} per 1,000 postings at the real fraud rate. "
-        f"Most of the fraud it misses ({history['complete']} of {len(missed)}) are complete, plausible ads "
-        "that break no rule in the policy; the evidence points to who posted them, which a posting-level policy can't see."
+        f"- Of 100 fraud postings, {m1['tp']} are flagged: {c1['fraud']['VIOLATING']} as VIOLATING and "
+        f"{c1['fraud']['NEEDS_REVIEW']} sent to an analyst."
+    )
+    w("- No legitimate posting is labeled VIOLATING.")
+    w(f"- {pct(v1s['review_load'])} of postings go to review.")
+    w(
+        f"- ${cost_reweighted(v1):.2f} per 1,000 postings at the real fraud rate; a typical posting takes "
+        f"{secs(v1s['latency_ms']['p50'])}, and 95% are labeled within 60 seconds at the brief's peak traffic."
+    )
+    w("- Most missed fraud breaks no rule in the policy: the giveaway is the employer.")
+    w("")
+
+    w("## How the test was run")
+    w("")
+    w(
+        "The code was frozen (git tag `eval-freeze`) and run once on the 400 under the brief's policy (v1), and once "
+        "under v2, which adds §6. Jev screens every posting, Claude Sonnet 5.5 reads those Jev can't clear, and code "
+        "checks the quotes and sets the label. The runs were in-process on a laptop, 8 postings at a time, with the "
+        "cache off, so every posting paid for its own model calls. The 400 are a quarter fraud, against about 5% in "
+        "the dataset, so there are enough fraud cases to measure."
+    )
+    w("")
+    w("## How a review is counted")
+    w("")
+    w(
+        "The dataset answers fraud or not; the agent has a third answer, NEEDS_REVIEW, meaning an analyst will look. "
+        "The **main** count treats a review as catching the fraud, since a person sees it. The **strict** count "
+        "accepts only VIOLATING. The share sent to review is the price of the main count, so it is reported alongside."
     )
     w("")
 
-    w("## The setup")
-    w("")
-    w(
-        "- **The 400:** the brief's fixed set, listed in `eval/eval_ids.txt`: 100 fraud and 300 legitimate, so 25% "
-        "fraud against the dataset's 4.8%. They and their 586 exact copies elsewhere in the dataset never went into "
-        "the database, prompts, examples or any tuning."
-    )
-    w(
-        "- **Frozen first:** the code was tagged `eval-freeze` before the first run, and each policy was run once."
-    )
-    w(
-        f"- **The agent:** `{v1s['config']}`. Jev screens every posting (a section scored 0.17 or more goes on); "
-        "Claude Sonnet 5.5 reads the rest against the policy; quotes are checked word for word in code; the label is "
-        "set in code from Claude's answers."
-    )
-    w(
-        "- **Where:** in-process on a laptop, 8 postings at a time, cache off, so every posting paid for its model calls."
-    )
-    w("")
-
-    w("## How NEEDS_REVIEW is counted")
-    w("")
-    w(
-        "The dataset has two answers (fraud or not); the agent has three. **The main count treats NEEDS_REVIEW as "
-        "flagging the posting**, like VIOLATING: an analyst will look at it, so the fraud isn't missed. The strict count "
-        "takes only VIOLATING as flagged. Both are shown; the review load (how many go to an analyst) is the price of "
-        "the main count."
-    )
-    w("")
-
-    w("## Precision, recall and F1 (the fraud class)")
+    w("## Catching fraud")
     w("")
     w("| Policy | Precision | Recall | F1 | Strict precision | Strict recall | Precision at 4.8% fraud |")
     w("| --- | --- | --- | --- | --- | --- | --- |")
@@ -187,40 +185,43 @@ def build() -> str:
         )
     w("")
     w(
-        f"95% intervals (bootstrap) for v1: precision {interval(m1['ci95']['precision'])}, recall "
-        f"{interval(m1['ci95']['recall'])}, F1 {interval(m1['ci95']['f1'])}. With 100 fraud postings, a difference "
-        f"of a few points between v1 and v2 is inside the noise."
+        f"Under v1, {pct(m1['precision'])} of the postings flagged are fraud (precision) and {pct(m1['recall'])} of "
+        f"the fraud is flagged (recall). When the agent says VIOLATING it is right every time (strict precision "
+        f"{v1s['strict']['precision']:.2f}), but it says so for only {pct(v1s['strict']['recall'])} of fraud: most fraud "
+        f"goes to review instead. v2 flags more fraud ({pct(m2['recall'])}) at the cost of more false alarms. The 95% "
+        f"ranges are wide (v1's recall runs from {interval(m1['ci95']['recall'])}), so v1 and v2 are within the noise "
+        "of each other."
     )
     w("")
     w(
-        "Precision at 4.8% fraud is what precision would be at the dataset's real rate: on the 400, one posting in four "
-        "is fraud, which makes precision look better than it would be in production."
+        f"The last column matters most for production. The test set is a quarter fraud; the real world is about 5%. "
+        f"At the real rate, about 1 in {round(1 / m1['precision_at_real_rate'])} flagged postings would be fraud, which "
+        "is why the review queue is treated as a cost, and why accuracy alone would mislead."
     )
     w("")
-
-    w("## Confusion matrix")
+    w("**Confusion matrix.** Rows are the dataset's answer; columns are the agent's label.")
     w("")
-    w("**v1**")
+    w("v1:")
     w("")
     out.extend(confusion_table(v1s))
     w("")
-    w("**v2**")
+    w("v2:")
     w("")
     out.extend(confusion_table(v2s))
     w("")
     causes = v1s["review_causes"]
     w(
         f"**Review load:** {pct(v1s['review_load'], 1)} of postings under v1, {pct(v2s['review_load'], 1)} under v2. "
-        f"Under v1, {causes.get('review_section_matched', 0)} went to review because a section that sends to review "
-        f"matched (mostly §5, unverifiable employer) and {causes.get('section_unsure', 0)} because Claude was unsure "
-        "about a section."
+        f"Most come from §5: a posting with no identifiable employer goes to review even when nothing else is wrong. "
+        f"Under v1, {causes.get('review_section_matched', 0)} went to review because such a section matched, and "
+        f"{causes.get('section_unsure', 0)} because Claude was unsure about a section."
     )
     w("")
 
-    w("## Cost and latency")
+    w("## Cost and speed")
     w("")
     w(
-        "| Policy | Cost per 1,000 (the 400, 25% fraud) | Cost per 1,000 at 4.8% fraud | Typical (p50) | Slowest 5% (p95) |"
+        "| Policy | Cost per 1,000 on the test set | Cost per 1,000 at 4.8% fraud | Typical posting | Slowest 5% |"
     )
     w("| --- | --- | --- | --- | --- |")
     for name, s, rows in (("v1", v1s, v1), ("v2", v2s, v2)):
@@ -230,71 +231,92 @@ def build() -> str:
         )
     w("")
     w(
-        f"- **Jev decides most postings alone:** under v1, {cleared} of 400 were cleared by Jev (on average "
-        f"${mean([r['cost_usd'] for r in cleared_rows]):.4f} and {secs(mean([r['latency_ms'] for r in cleared_rows]))} each) "
-        "and never reached Claude. Fraud reaches Claude more often, so at the real 4.8% fraud rate the cost is lower."
-    )
-    w(
-        f"- **Claude is the slow step:** the postings it read took {secs(mean([r['latency_ms'] for r in read_rows_]))} "
-        f"and cost ${mean([r['cost_usd'] for r in read_rows_]):.4f} on average, which sets the p95. Latency is per "
-        "posting, on a laptop, with 8 in flight."
-    )
-    w(
-        f"- **These two runs cost** ${sum(r['cost_usd'] for r in v1):.2f} and ${sum(r['cost_usd'] for r in v2):.2f}."
+        f"Jev decides most postings alone: {cleared} of the 400 were cleared without Claude, at about "
+        f"${mean([r['cost_usd'] for r in cleared_rows]):.4f} and {secs(mean([r['latency_ms'] for r in cleared_rows]))} "
+        f"each. The rest went to Claude at about ${mean([r['cost_usd'] for r in read_rows_]):.4f} and "
+        f"{secs(mean([r['latency_ms'] for r in read_rows_]))} each, which sets the slow tail. Fraud reaches Claude more "
+        "often, so the cost at the real fraud rate is lower than on the test set. These times are the work on each "
+        f"posting only; the next section adds the wait in the queue. The two runs cost "
+        f"${sum(r['cost_usd'] for r in v1):.2f} and ${sum(r['cost_usd'] for r in v2):.2f}."
     )
     w("")
 
-    w("## Under load: the 60-second target")
+    w("## Under load: 95% within 60 seconds")
     w("")
     w(
-        "The latency above is each posting's working time. The brief's target also counts waiting: 95% labeled within "
-        "60 s of arriving. So real postings went through the real API, queue and workers, at the brief's 5x peak "
-        "(11.6 a second, for 30 s) and as a burst of 200 at once, each timed from arrival to saved label "
-        "(`scripts/load_test.py`)."
+        "The brief's target is 95% of postings labeled within 60 seconds, at five times the normal traffic. The times "
+        "above measure only how long one posting takes to work through. Under load, what matters is the wait in the "
+        "queue plus the work, so this was tested end to end."
     )
     w("")
     w(
-        "| Workers (parallel jobs) | Peak: typical / 95% | Burst of 200: typical / 95% | Labeled per second | All within 60 s |"
+        "**How.** Real postings went through the real API, queue and workers, each timed from the moment the API "
+        "accepted it to the moment its label was saved (`scripts/load_test.py`). Two kinds of traffic:"
     )
-    w("| --- | --- | --- | --- | --- |")
-    for lanes, label in (("16", "1 worker × 16"), ("48", "3 workers × 16")):
-        peak, burst = summary(f"load-peak-{lanes}"), summary(f"load-burst-{lanes}")
-        pk, bs = peak["submit_to_label_s"], burst["submit_to_label_s"]
-        ok = "yes" if peak["within_60s"] == 1 and burst["within_60s"] == 1 else "no"
-        w(
-            f"| {label} | {pk['p50']} s / {pk['p95']} s | {bs['p50']} s / {bs['p95']} s | {peak['throughput_per_s']} | {ok} |"
-        )
     w("")
-    p16, p48 = summary("load-peak-16"), summary("load-peak-48")
-    runs = [summary(f"load-{k}") for k in ("peak-16", "burst-16", "peak-48", "burst-48")]
     w(
-        f"With 16 parallel jobs it labels about {p16['throughput_per_s']} postings a second while 11.6 arrive, so the "
-        "queue grows: the 30-second peak still made it, a longer one wouldn't. With 48 it keeps up and the wait almost "
-        f"disappears ({p48['submit_to_label_s']['p95']} s at the 95th percentile). That is the case for autoscaling on "
-        "queue age in DESIGN.md: add workers when the oldest job has waited about 20 s. "
-        f"No posting failed, and the four runs cost ${sum(r['cost_usd'] for r in runs):.2f}."
+        "- **The brief's peak:** 200,000 postings a day is about 2.3 a second, and five times that is 11.6 a second, "
+        f"held for 30 seconds ({peak16['postings']} postings)."
+    )
+    w(f"- **A burst:** {burst16['postings']} postings in one request, like a marketplace sending a backlog.")
+    w("")
+    w(
+        "Both ran at two sizes: one worker doing 16 jobs at once, and three workers doing 16 each, 48 in total. Three "
+        "workers mirror the autoscaling in the design."
+    )
+    w("")
+    w(
+        f"**With 16 parallel jobs,** the system labels about {peak16['throughput_per_s']:.1f} postings a second while "
+        f"11.6 arrive, so the queue grows. At the peak, a typical posting took {peak16['submit_to_label_s']['p50']} s and "
+        f"the slowest 5% took {peak16['submit_to_label_s']['p95']} s; the burst finished with the slowest 5% at "
+        f"{burst16['submit_to_label_s']['p95']} s. Every posting made it under 60 seconds, but only because the peak "
+        "lasted 30 seconds: a longer peak would keep the queue growing until the target broke. 16 is not enough "
+        "capacity for a sustained peak."
+    )
+    w("")
+    w(
+        f"**With 48 parallel jobs,** it keeps up. At the peak, a typical posting took {peak48['submit_to_label_s']['p50']} s "
+        f"and the slowest 5% {peak48['submit_to_label_s']['p95']} s, close to the working time alone, with almost no "
+        f"waiting. The burst cleared with the slowest 5% at {burst48['submit_to_label_s']['p95']} s."
+    )
+    w("")
+    w("**What it shows:**")
+    w("")
+    w("1. The 60-second target holds at the brief's peak, with room to spare, once there is enough capacity.")
+    w(
+        "2. Capacity has to grow with the queue. That is the design's choice: workers scale on how long the oldest job "
+        "has waited, not on CPU, because workers mostly wait on the models and CPU stays low even when they are "
+        "overloaded."
+    )
+    w("")
+    failed = sum(r["failed"] for r in (peak16, burst16, peak48, burst48))
+    w(
+        f"{'No posting failed' if failed == 0 else f'{failed} postings failed'}, and the four runs cost ${load_cost:.2f}."
     )
     w("")
 
-    w("## Evidence and confidence")
+    w("## Can the evidence be trusted?")
     w("")
     q = v1s["quotes"]
     w(
-        f"- **Every quote shown is real:** Claude quoted {q['verified'] + q['dropped']} passages as evidence under v1; "
+        f"**Every quote shown is real.** Under v1, Claude gave {q['verified'] + q['dropped']} quotes as evidence, and "
         f"{q['verified']} ({pct(q['verified_share'])}) were found word for word in the posting. The other {q['dropped']} "
-        "were dropped and never shown; a section left without evidence can't make a posting VIOLATING."
+        "were dropped and never shown, and a section left without a verified quote can't make a posting VIOLATING."
     )
-    top = v1s["calibration"][-1]
-    w(
-        f"- **High confidence is mostly right:** {pct(top['correct'])} of the labels given {top['confidence'].split('-')[0]} "
-        "or more are correct (a fraud posting flagged, or a legitimate one allowed), against about half below 0.7. "
-        "Below 0.7 the buckets are small, so their order isn't meaningful."
-    )
+    w("")
+    w("**Confidence means something at the top end:**")
     w("")
     w("| Confidence | Postings | Correct |")
     w("| --- | --- | --- |")
     for bucket in v1s["calibration"]:
         w(f"| {bucket['confidence']} | {bucket['n']} | {pct(bucket['correct'])} |")
+    w("")
+    top = v1s["calibration"][-1]
+    w(
+        f"When the agent gives {top['confidence'].split('-')[0]} or more, it is right {pct(top['correct'])} of the time "
+        "(a fraud posting flagged, or a legitimate one allowed). Below 0.7 the groups are small, so their order means "
+        "little."
+    )
     w("")
 
     w("## Why fraud gets through, and how we know")
@@ -327,9 +349,8 @@ def build() -> str:
     w("## The policy change, without code")
     w("")
     w(
-        "Publishing a new version changes labels with no code change, and re-labels existing postings in the cheapest "
-        "valid way (see README, Changing the policy). Each version run on the same 100 development postings with "
-        "real models:"
+        "Publishing a new policy version changes labels with no code change. Each version below was run on the same "
+        "100 development postings with real models, to see how many labels it changes and what the re-label costs:"
     )
     w("")
     w("| Version | What changed | Labels that changed | Of these, from the edit | Cost of the re-label |")
@@ -347,17 +368,18 @@ def build() -> str:
         )
     w("")
     w(
-        "v4 costs nothing: only what a section leads to changed, not what Claude is asked, so the stored answers are "
-        "decided again in code. A change not from the edit is Claude answering differently when asked again; the "
-        "Test report marks which is which before anyone publishes."
+        '"From the edit" counts changes that involve a section the version changed. The rest are Claude answering '
+        "differently when asked the same thing again; the Test report separates the two before anyone publishes. "
+        "v4 costs nothing: only what §4 leads to changed, not what Claude is asked, so the stored answers were decided "
+        "again in code."
     )
     w("")
     w(
-        "**Fixed suites:** "
+        "**Hand-written cases,** run with real models on every change to the agent or policy: "
         + ", ".join(
             f"{label} {suites[run]['passed']} of {suites[run]['total']}"
             for label, run in (
-                ("policy change under v1", "pc-v1"),
+                ("policy changes under v1", "pc-v1"),
                 ("v2", "pc-v2"),
                 ("v3", "pc-v3"),
                 ("v4", "pc-v4"),
@@ -365,17 +387,18 @@ def build() -> str:
                 ("edge cases", "gate-edge_cases"),
             )
         )
-        + " passed."
+        + ", all passed."
     )
     w("")
 
     w("## Other set-ups (development postings only)")
     w("")
     w(
-        "Compared on the 300 development postings, not on the 400 (the 400 were run once, with the chosen set-up):"
+        "Three ways to run the agent, compared on the 300 development postings. The 400 were run once, with the "
+        "chosen set-up, so they stay a clean test:"
     )
     w("")
-    w("| Set-up | Precision | Recall | F1 | Cost per 1,000 | p50 | p95 |")
+    w("| Set-up | Precision | Recall | F1 | Cost per 1,000 | Typical posting | Slowest 5% |")
     w("| --- | --- | --- | --- | --- | --- | --- |")
     names = {
         "jev_sonnet": "Jev screen, then Claude Sonnet (chosen)",
@@ -390,18 +413,22 @@ def build() -> str:
         )
     w("")
     w(
-        "The screen changes cost and speed, not quality: every set-up lands within a few points, inside the noise."
+        "The screen changes cost and speed, not quality: all three land within a few points of each other, inside the "
+        f"noise. Running Claude on every posting costs {sonnet_ratio:.1f} times as much and is slower for a typical "
+        "posting; the Haiku screen, used only while Jev is down, is the slowest."
     )
     w("")
 
     w("## Error analysis")
     w("")
     w(
-        f"Nine postings, read by hand after the runs (`eval/error_analysis.yaml`). Under v1, {len(false_alarms)} "
-        f"legitimate postings were sent to review, {alarms_s5} of them over §5."
+        f"Nine postings the agent got wrong, read by hand after the runs (`eval/error_analysis.yaml`). Most missed "
+        "fraud is a clean ad from an employer whose other postings are fraud. Most false alarms are short agency ads "
+        f"with no company named, which §5 sends to review: under v1, {alarms_s5} of the {len(false_alarms)} legitimate "
+        "postings sent to review were §5. Two are cases where the dataset's own label is debatable."
     )
     w("")
-    w("| Posting | Dataset | Ours | Why |")
+    w("| Posting | Dataset says | Agent | Why |")
     w("| --- | --- | --- | --- |")
     for e in errors:
         note = " ".join(e["note"].split())
@@ -430,7 +457,9 @@ def build() -> str:
         "- **Jev's scores move a little between runs.** One legitimate posting scored 0.51 for injection in one run "
         "(held) and under 0.5 in the other (allowed)."
     )
-    w("- **Latency is from a laptop,** with the model APIs over the public internet.")
+    w(
+        "- **Times are from a laptop,** with the model APIs over the public internet; the load test ran up to 48 parallel jobs on one machine."
+    )
     w("")
     return "\n".join(out)
 

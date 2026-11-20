@@ -149,11 +149,13 @@ After `make demo`, at http://localhost:8000:
 
 ## How it's tested
 
-- **Code:** 269 Python tests (API, agent, queue, policy versions, data; the models are faked), 25 UI unit tests and 17 browser tests, on every pull request.
-- **Quality:** the 400 test postings the assignment fixes are never used for tuning; the agent ran on them once under each policy. Hand-written cases (edge cases, injections, policy changes) run with real models on every change to the agent or policy, and a change below its pass mark can't merge.
-- **Load:** real postings through the real API, queue and workers, at the brief's 5x peak and as a burst, with 16 and 48 parallel jobs. This is how Part A's autoscaling (add workers as the queue ages) is checked here: every posting was labeled within 60 seconds, and at 48 the 95th percentile was 6 seconds.
+Testing happens at three levels.
 
-In short: 59 of 100 fraud postings flagged, no legitimate posting labeled VIOLATING, 23% sent to review, $2.75 per 1,000 postings at the real fraud rate. **The detailed results, error analysis and load numbers are in [RESULTS.md](RESULTS.md).**
+- **The code.** 269 Python tests cover the API, the agent's steps, the queue, policy versions and the data split. The models are faked, so the tests are fast and free. 25 UI unit tests and 17 browser tests click through the real app: browsing, opening a posting, roles, Test and Publish, the live demo. All of them run on every pull request.
+- **The quality.** The 400 test postings the assignment fixes are never used for tuning; the agent ran on them once per policy. Every change to the agent or the policy also reruns hand-written cases with real models (edge cases, injections, policy changes), and a change that scores below its pass mark can't merge.
+- **The load.** The brief asks for 95% of postings labeled within 60 seconds at five times normal traffic. Real postings went through the real API, queue and workers at that rate, and as a burst of 200. With 16 jobs at a time the target held, but the queue was growing; with 48 (three workers), the slowest 5% took about 6 seconds. This is how the design's autoscaling is checked here.
+
+The headline: 59 of 100 fraud postings flagged, no legitimate posting labeled VIOLATING, 23% sent to review, $2.75 per 1,000 postings. **The details are in [RESULTS.md](RESULTS.md).**
 
 To run the evaluation yourself:
 

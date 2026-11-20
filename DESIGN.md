@@ -22,7 +22,7 @@ Three ECS services in private subnets, reached from API Gateway through VPC Link
 
 **Labels are never overwritten:** one row per job, policy version and model version, so a rollback only switches the live version. An analyst's decision always wins.
 
-**Queues and storage.** Workers take live jobs before re-labels and Test runs, under a cap below the model quota. Aurora holds postings, labels with per-section findings and drafts; S3 keeps each published policy frozen; AppConfig says which version is live.
+**Queues and storage.** Live jobs go before re-labels and Test runs. Aurora holds postings, labels and drafts; S3 keeps each published policy frozen; AppConfig says which is live.
 
 **Policy as data.** Editors change sections (text, effect, examples, screen question, fraud words) in a draft. *Test* labels recent posts in shadow and lists the labels that would flip. *Publish*, by a publisher who didn't edit it, freezes the version and rolls it out 5%, 25%, 100% with automatic rollback. Posts the Test labeled keep those labels.
 
@@ -39,7 +39,7 @@ Three ECS services in private subnets, reached from API Gateway through VPC Link
 
 ## 2. Scaling
 
-Live traffic peaks at 11.6 posts a second (116 at 10x); re-labeling 6 million posts after a policy change is the real load, 33 hours at 50 a second, on its own queue with half-price batch inference. Workers scale on the oldest message's age, not CPU, since they mostly wait on models (*measured*: p50 0.7 s, p95 6.8 s).
+Live traffic peaks at 11.6 posts a second (116 at 10x). The real load is re-labeling 6 million posts after a policy change: 33 hours at 50 a second, on its own queue at batch prices. Workers scale on queue age, not CPU (*measured*: p50 0.7 s, p95 6.8 s).
 
 | What breaks first | Fix |
 | --- | --- |
@@ -49,7 +49,7 @@ Live traffic peaks at 11.6 posts a second (116 at 10x); re-labeling 6 million po
 
 ## 3. Cost
 
-*Measured* on the 400 at the real 4.8% fraud rate: **$2.75 per 1,000 posts, about $17,500 a month all-in** for 6 million posts. Jev clears 63% at $0.0001 each; Sonnet labels the other 37% at $0.0075 each, with the fixed policy text cached.
+*Measured* on the held-out set, at the real 4.8% fraud rate: **$2.75 per 1,000 posts, about $17,500 a month all-in** for 6 million posts. Jev clears 63% at $0.0001 each; Sonnet labels the other 37% at $0.0075 each, with the fixed policy text cached.
 
 | Option | Per 1,000 | Per month |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ Live traffic peaks at 11.6 posts a second (116 at 10x); re-labeling 6 million po
 | C: Jev, then Haiku, Sonnet on the hardest 2% | about $0.50 | about $3,000 |
 | Fallback: Haiku screen while Jev is down | $4.72 (*measured*, dev) | about $300 a day extra while down |
 
-B over C: in C most VIOLATING labels would rest on the cheaper model. Next savings: shorter output (about $4,400 a month) and the result cache for the 10% of posts that repeat (about $1,600). A re-label costs $0 when only outcomes change, about $1,500 for a new section, about $8,300 for everything. Prices as of 20 Nov 2026 ([Sonnet](https://www.llmreference.com/model/claude-sonnet-5-5/aws-bedrock), [Haiku](https://www.llmreference.com/model/claude-haiku-5-5/aws-bedrock), [Jev](https://flaviocopes.com/jev-pricing/), [Aurora](https://book.st-hakky.com/en/data-platform/rds-mysql-vs-aurora-cost-comparison)).
+B over C: in C most VIOLATING labels would rest on the cheaper model. Next savings: shorter output (about $4,400 a month) and the result cache for the 10% of posts that repeat (about $1,600). A re-label costs $0 when only outcomes change, about $1,500 for a new section, about $8,300 for everything. Prices as of 20 Nov 2026.
 
 ## 4. Agent design
 
@@ -99,12 +99,37 @@ flowchart LR
 - **Fail closed:** after 3 failed attempts the post is held at NEEDS\_REVIEW with a reason code, never ALLOWED.
 - **Crash recovery:** each finished step is saved, so a redelivered job resumes without paying the models twice.
 
-**Tools.** None: the policy fits in the prompt. The first to add is the employer's history (section 5).
+**Tools.** None: the policy fits in the prompt. The first to add is the employer's history: most missed fraud came from employers whose other postings are fraud, and this check would catch most of it ([RESULTS.md](RESULTS.md)).
 
 ## 5. Evaluation and quality over time
 
-**Offline.** The fixed 400 are only for reported numbers, never for prompts, thresholds or the gate: precision, recall and F1 with 95% ranges, NEEDS\_REVIEW counted as caught (headline) and not (strict), a confusion matrix, cost, latency and errors by cause. A gate of suites (decisions, edge cases, injection, policy change) runs in CI on every agent or prompt change.
+|  | Offline | In the flow | Online |
+| --- | --- | --- | --- |
+| **What** | Test sets with known answers | Code checks on every post | Real traffic in LangSmith |
+| **When** | Before a change ships | While each post is labeled | After shipping, continuously |
+| **If it fails** | The change is blocked | Post goes to review | Alert, and the case is queued for an analyst |
 
-**What the 400 showed** (*measured*). 59 of 100 fraud flagged, no legitimate post VIOLATING. §5 drives precision: 68 of 100 fraud and 57 of 300 legitimate posts have no company profile. The misses come from the policy, not the screen: Claude alone would have allowed almost all the fraud Jev cleared. Most are clean ads whose company profile appears only on other fraud, so **checking the employer's history would catch 27 of the 41 with no new false alarms.**
+**Offline: before a change ships**
 
-**Production.** LLM judges score a small LangSmith sample, low scores going to an annotation queue; 1% of Jev-cleared posts get a human audit, the only independent check on Jev. Drift is checked daily per version (label rates, Jev's clear rate, injection flags). Any change ships through the gate, a shadow Test and a phased rollout.
+| Test set | Right answer | Used for |
+| --- | --- | --- |
+| Held-out set: 400 postings, 100 fraud | The dataset's fraud label | Reported numbers only, never tuning |
+| Development set: 300 postings | The dataset's fraud label | Tuning and comparing set-ups |
+| Hand-written cases: edge cases, injections, policy changes | Expected label and sections | Blocking bad changes |
+
+- **Metrics:** precision, recall and F1 with 95% ranges (NEEDS\_REVIEW counted as caught, and not), a confusion matrix, cost, latency, error types.
+- **Release check in CI:** every change to the agent, prompts or policy reruns the hand-written cases. If any scores below its pass mark, the change can't merge. Pass marks come from 3 baseline runs, with no tolerance on verbatim quotes or injections. An outage isn't counted as a failure; the run is repeated.
+
+**In the flow, every post:** code checks that each section exists, each quote is in the posting, and the label matches the findings. A failure sends the post to review with the reason.
+
+**Online: after shipping, in LangSmith**
+
+- **Code checks on every trace:** the same checks, so a failure that slips through shows up.
+- **LLM judges on a small sample** (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
+- **Human checks:** 1% of the posts Jev cleared without Claude go to an analyst anyway, because nothing else would catch a fraud Jev wrongly cleared; how often analysts overturn a label is tracked per section; confirmed mistakes join the hand-written cases.
+- **Drift:** daily, per policy version: label rates, how much Jev clears, injection flags.
+
+**Alerts (LangSmith and CloudWatch, to Slack)**
+
+- **Quality:** judge scores falling, more failed checks, more overrides.
+- **System:** errors, p95 over 45 s, a stalled queue, Jev failing, spend ahead of budget.

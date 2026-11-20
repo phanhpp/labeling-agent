@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, NavLink, Route, Routes } from "react-router";
 import { api } from "./api";
-import { SidePanel } from "./components/SidePanel";
+import { Chevron, SidePanel } from "./components/SidePanel";
 import { useLoad } from "./components/ui";
 import { SharedProvider, useShared } from "./context";
 import Browse from "./pages/Browse";
@@ -13,7 +13,7 @@ import Versions from "./pages/Versions";
 import "./styles.css";
 
 function Header() {
-  const { user, live, viewing, panelOpen, setPanelOpen } = useShared();
+  const { user, live, viewing, setPanelOpen } = useShared();
   const health = useLoad(api.health, []);
   return (
     <>
@@ -33,7 +33,6 @@ function Header() {
           <button className="whoami" onClick={() => setPanelOpen(true)} title="Change who you are in the side panel">
             <b>{user.name}</b> · {user.role}
           </button>
-          {!panelOpen && <button className="small" onClick={() => setPanelOpen(true)}>‹ Panel</button>}
         </span>
       </header>
       {health.data?.llm_backend === "fake" && (
@@ -51,11 +50,20 @@ function Header() {
 }
 
 function App() {
-  const { user, viewing, panelOpen } = useShared();
+  const { user, viewing, panelOpen, setPanelOpen, panelWidth } = useShared();
   return (
     <>
       <Header />
-      <div className={`layout ${panelOpen ? "" : "folded"}`}>
+      <div className={`layout ${panelOpen ? "" : "folded"}`} style={{ "--side-w": `${panelWidth}px` } as React.CSSProperties}>
+        {panelOpen ? (
+          <SidePanel />
+        ) : (
+          <div className="rail">
+            <button className="icon" onClick={() => setPanelOpen(true)} aria-label="Open the side panel" title="Open the panel">
+              <Chevron direction="right" />
+            </button>
+          </div>
+        )}
         {/* key: switching user or version reloads the page's data */}
         <Routes key={`${user.key}-${viewing ?? "live"}`}>
           <Route path="/" element={<Browse />} />
@@ -65,7 +73,6 @@ function App() {
           <Route path="/compare" element={<Compare />} />
           <Route path="*" element={<p className="page">Page not found.</p>} />
         </Routes>
-        {panelOpen && <SidePanel />}
       </div>
     </>
   );

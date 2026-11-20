@@ -1,23 +1,50 @@
+import { useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useShared, type Tagged } from "../context";
 import { USERS } from "../roles";
 
 const tagWords = (v: Tagged) => (v.tags.length ? ` (${v.tags.join(", ")})` : "");
 
-// The panel on the right: who you are, which policy version the pages show, and comparing the
-// latest version with the previous one. It folds away; the header keeps showing who you are.
+// Chevrons for folding and opening the panel.
+export function Chevron({ direction }: { direction: "left" | "right" }) {
+  const d = direction === "left" ? "M10 3 5 8l5 5M14 3 9 8l5 5" : "M6 3l5 5-5 5M2 3l5 5-5 5";
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// The left panel: who you are, which policy version the pages show, comparing the latest version
+// with the previous one, and below them the current page's own filters (the Labels list puts its
+// filters in #sidebar-slot). It folds to a thin rail, and its right edge can be dragged to resize it.
 export function SidePanel() {
-  const { user, setUser, versions, live, latest, previous, viewing, setViewing, setPanelOpen } = useShared();
+  const { user, setUser, versions, live, latest, previous, viewing, setViewing, setPanelOpen, setPanelWidth } = useShared();
   const navigate = useNavigate();
+  const box = useRef<HTMLElement>(null);
   const published = versions.filter((v) => v.status !== "draft");
   const shown = viewing ?? live;
   const shownVersion = versions.find((v) => v.name === shown);
 
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const left = box.current?.getBoundingClientRect().left ?? 0;
+    const move = (ev: PointerEvent) => setPanelWidth(ev.clientX - left);
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
   return (
-    <aside className="side" aria-label="Side panel">
-      <div className="buttons" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+    <aside className="side" aria-label="Side panel" ref={box}>
+      <div className="side-head">
         <b>Workspace</b>
-        <button className="small" onClick={() => setPanelOpen(false)} aria-label="Fold the side panel">Fold ›</button>
+        <button className="icon" onClick={() => setPanelOpen(false)} aria-label="Fold the side panel" title="Fold the panel">
+          <Chevron direction="left" />
+        </button>
       </div>
 
       <section>
@@ -46,28 +73,23 @@ export function SidePanel() {
             {shownVersion.tags.map((t) => <span key={t} className={`tag ${t}`}>{t}</span>)}
           </div>
         )}
-        <p>
-          The pages show labels under this version. Choosing one never changes what is live: only publishing does.
-          {viewing && live && <> New postings are labeled under <b>{live}</b>.</>}
-        </p>
+        <p>Choosing a version changes what the pages show, never what is live: only publishing does.</p>
       </section>
 
       <section>
         <span className="label-text">How labels changed</span>
-        <button
-          className="full"
-          disabled={!previous || !latest}
-          onClick={() => navigate(`/compare?from=${previous}&to=${latest}`)}
-        >
+        <button className="full" disabled={!previous || !latest} onClick={() => navigate(`/compare?from=${previous}&to=${latest}`)}>
           {previous && latest ? `Compare ${previous} → ${latest}` : "Compare previous → latest"}
         </button>
         <p>
-          {previous && latest
-            ? `Every posting labeled under both: its label under ${previous} (previous) next to ${latest} (latest).`
-            : "Needs two published versions."}
+          {previous && latest ? `Each posting's label under ${previous} (previous) next to ${latest} (latest).` : "Needs two published versions."}{" "}
+          <Link to="/versions">Manage versions</Link>
         </p>
-        <p><Link to="/versions">Manage versions →</Link></p>
       </section>
+
+      <div id="sidebar-slot" />
+
+      <div className="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" onPointerDown={startResize} title="Drag to resize" />
     </aside>
   );
 }

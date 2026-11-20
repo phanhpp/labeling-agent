@@ -160,7 +160,7 @@ test("the side panel folds, shows an older version without changing what is live
   await page.goto("/");
   await page.getByRole("button", { name: "Fold the side panel" }).click();
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeHidden();
-  await page.getByRole("button", { name: "‹ Panel" }).click();
+  await page.getByRole("button", { name: "Open the side panel" }).click();
   await expect(page.getByRole("complementary", { name: "Side panel" })).toBeVisible();
 
   await page.getByLabel("Policy shown").selectOption("v1");

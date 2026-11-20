@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api, type LabelRow } from "../api";
 import { PolicyMatch } from "../components/PolicyMatch";
@@ -11,7 +12,10 @@ import { field } from "../lib/words";
 export default function Browse() {
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
-  const { sections, viewing } = useShared();
+  const { sections, viewing, panelOpen } = useShared();
+  // With the side panel open, the filters go into it; folded, they sit beside the list.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setSlot(panelOpen ? document.getElementById("sidebar-slot") : null), [panelOpen]);
   const navigate = useNavigate();
   const { data, error } = useLoad(() => api.labels({ ...filters, version: filters.version ?? viewing ?? undefined }), [params.toString(), viewing]);
   const set = (next: Filters) => setParams(toParams(next));
@@ -26,9 +30,9 @@ export default function Browse() {
   const { offset } = pageWindow(filters);
   const pages = data ? Math.max(1, Math.ceil(data.total / per)) : 1;
 
-  return (
-    <div className="page browse">
-      <aside className="filters">
+  const filtersPanel = (
+    <div className="filters" aria-label="Filters">
+      <span className="label-text">Filters</span>
         <input
           className="search"
           placeholder="Search job id"
@@ -62,7 +66,12 @@ export default function Browse() {
             <span className="n">{n}</span>
           </button>
         ))}
-      </aside>
+    </div>
+  );
+
+  return (
+    <div className={`page browse ${slot ? "filters-in-panel" : ""}`}>
+      {slot ? createPortal(filtersPanel, slot) : <aside>{filtersPanel}</aside>}
 
       <main>
         <ErrorNote error={error} />
@@ -92,10 +101,10 @@ export default function Browse() {
                 <thead>
                   <tr>
                     <th>Label</th>
-                    <th className="hide-sm">Job</th>
+                    <th className="hide-sm job-col">Job</th>
                     <th className="col-posting">Posting and its evidence</th>
                     <th className="col-match hide-sm">Policy match</th>
-                    <th className="hide-sm" title="How sure the model said it was, from 0 to 1 (its own estimate)">Confidence</th>
+                    <th className="hide-sm conf-col" title="How sure the model said it was, from 0 to 1 (its own estimate)">Confidence</th>
                     <th className="hide-sm col-why">Why</th>
                   </tr>
                 </thead>

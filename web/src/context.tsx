@@ -22,6 +22,8 @@ type Shared = {
   sections: Record<string, string>; // section titles of the version being viewed
   panelOpen: boolean;
   setPanelOpen: (open: boolean) => void;
+  panelWidth: number;
+  setPanelWidth: (px: number) => void;
   refreshVersions: () => void;
 };
 const Context = createContext<Shared | null>(null);
@@ -82,6 +84,12 @@ export function SharedProvider({ children }: { children: ReactNode }) {
     store("viewing", name);
     setViewingState(name);
   };
+  const [panelWidth, setPanelWidthState] = useState<number>(() => Number(stored("panel-width", "280")) || 280);
+  const setPanelWidth = (px: number) => {
+    const clamped = Math.round(Math.min(480, Math.max(220, px)));
+    store("panel-width", String(clamped));
+    setPanelWidthState(clamped);
+  };
   const setPanelOpen = (open: boolean) => {
     store("panel", open ? "open" : "folded");
     setPanelOpenState(open);
@@ -111,7 +119,7 @@ export function SharedProvider({ children }: { children: ReactNode }) {
       value={{
         user, setUser, versions, live, latest, previous,
         viewing: shown === live ? null : shown, setViewing,
-        sections, panelOpen, setPanelOpen, refreshVersions,
+        sections, panelOpen, setPanelOpen, panelWidth, setPanelWidth, refreshVersions,
       }}
     >
       {children}

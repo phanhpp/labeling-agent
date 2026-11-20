@@ -1,6 +1,6 @@
 # Policy labeling agent
 
-Reads a job posting and decides whether it breaks a fraud policy. For each posting it gives one of three labels, the policy sections behind it, and the exact sentences from the posting that show it. For example:
+Reads a job posting and decides whether it breaks a fraud policy. For each posting it gives one of three labels, the policy sections behind it, and the exact sentences from the posting that show it:
 
 ```json
 {
@@ -18,128 +18,134 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 - **NEEDS_REVIEW:** not clear enough to decide, so an analyst looks at it.
 - **ALLOWED:** nothing in the policy matches.
 
-The key idea: **a model reads the posting and points at the evidence; plain code checks that evidence and sets the label.** Every quote must really be in the posting, the model never chooses the label itself, and when anything fails the posting goes to review, never quietly to ALLOWED.
+**The key idea: a model reads the posting and points at the evidence; plain code checks that evidence and sets the label.** Every quote must really be in the posting, the model never chooses the label, and when anything fails the posting goes to review, never quietly to ALLOWED.
 
-The design for running this on AWS is in [DESIGN.md](DESIGN.md). This repo runs the same system on your machine.
+[DESIGN.md](DESIGN.md) is the design for running this on AWS (Part A). This repo runs the same system on your machine (Part B). [RESULTS.md](RESULTS.md) has the measured results.
 
-## Run it
+## Quick start
 
-You need Docker. For development also [uv](https://docs.astral.sh/uv/) (Python) and pnpm (Node).
+You need Docker.
+
+**No keys, no cost** (a stand-in model labels by simple word rules):
 
 ```
-cp .env.example .env     # then add ANTHROPIC_API_KEY and TYPESAFE_API_KEY to label for real
-make up                  # starts the database, the API and the worker in Docker
+cp .env.example .env
+make up-fake seed        # the app, plus 14 sample postings, an analyst decision and a draft policy
 open http://localhost:8000
 ```
 
-- **Without keys** it still starts: postings are accepted and wait in a queue, and the page says labeling is off.
-- **With keys, ready for a demo:** `make demo` starts from an empty database, labels 100 real development postings with Claude (about $0.35), and loads `policies/v2.yaml` (adds §6) as an untested draft v2, to Test and publish in the UI.
-- **To try it with no keys and no cost:** `make up-fake seed`. A fake model labels by simple word rules, and `seed` adds 14 sample postings, an analyst decision and a draft policy.
-- **To stop:** `make down`. Your data is kept for next time.
-- **To reset the demo:** `make reset` deletes the local demo database (the Docker volume on your machine), so the next `make up` starts empty. The demo scripts need this.
-
-### The live demo
-
-After `make demo`, everything happens in the UI at http://localhost:8000. The Workspace panel on the right holds the controls.
-
-1. **New postings arrive:** as Eddie (editor), use "Live demo: send real postings". Pick 10 to 100 postings and a mix: real (about 5% fraud) or 25% fraud. They are random dataset rows, never the 400 kept for the eval and never one already sent, sent the way the marketplace sends them. The panel shows them being labeled, then the result: labels, how many skipped Claude, cost and time. "Show this run in the list" lists only those postings.
-2. **Check against the dataset:** switch on "Compare with the dataset's label". The list then shows the dataset's own answer next to ours ("caught", "missed fraud", "false alarm"), with a filter for disagreements only. The agent never sees this label; it is stored apart and read only by the analyst pages.
-3. **Change the policy:** open Versions, then draft v2 (adds §6). As Eddie: Test it, then Submit. As Sam (publisher): Publish. The re-label shows its progress; when it is done, "Compare v1 → v2" lists every label that changed.
-4. **New postings follow the new policy:** send a few more postings. They are labeled under v2 straight away, with no restart and no code change.
-
-### Running the parts separately (development)
-
-Three terminals, each reloading when you change code:
+**Real models** (Claude and Jev):
 
 ```
-make api       # Postgres in Docker, then the API from source:   http://localhost:8000
-make worker    # the worker that labels queued postings
-make web       # the UI with hot reload:                         http://localhost:5173
+cp .env.example .env     # then add ANTHROPIC_API_KEY and TYPESAFE_API_KEY
+make demo                # an empty database, 100 real postings labeled (about $0.35), policy v2 loaded as a draft
+open http://localhost:8000
 ```
 
-The UI on :5173 forwards its API calls to :8000. In `make up` there is no separate UI server: the API serves the built UI itself.
+`make down` stops everything and keeps the data; `make reset` deletes the local database so the next start is empty. Without keys, `make up` still starts: postings wait in the queue and the page says labeling is off.
+
+## Commands
 
 Every `make` target is one or two plain commands; see the [Makefile](Makefile).
 
-## How a posting is labeled
+| Group | Command | What it does |
+| --- | --- | --- |
+| **Run** | `make up` | The database, API, UI and worker in Docker, on http://localhost:8000 |
+| | `make up-fake` | The same with the stand-in model: no keys, no cost |
+| | `make demo` | A fresh start with real models: 100 postings labeled, policy v2 ready to Test (about $0.35) |
+| | `make down` / `make reset` | Stop (data kept) / delete the local database |
+| **Demo helpers** | `make seed` | 14 sample postings, a decision and a draft, into any running app |
+| | `make demo-draft` | Load `policies/v2.yaml` as an untested draft |
+| | `make guardrails` | Show the API refusing bad requests and holding an injection |
+| **Develop** | `make api`, `make worker`, `make web` | Each part from source with live reload (the UI on :5173) |
+| **Test** | `make test` | Python tests (models faked) and the UI's unit tests |
+| | `make lint` | Style and type checks |
+| | `make e2e` | Browser tests against a running app (after `make up-fake seed`) |
+| **Evaluate** | `make eval-dev` | Real models on 50 development postings, a quick check (about $0.20) |
+| | `make results` | Rebuild RESULTS.md from the saved runs, and check it matches them |
+| | `make load-test` | The 60-second target under the 5x peak and a burst (about $1.50) |
+| | `make demo-versions` | Policy v2 to v4 with real models on 100 postings (about $1) |
+
+## What Part B does
+
+**How a posting is labeled.** The API saves it and queues a job; a worker runs the agent:
+
+```mermaid
+flowchart TB
+  P[Posting arrives at the API] --> Q[[Job queue]] --> W[Worker runs the agent]
+  W --> CL[1. Clean: remove hidden text]
+  CL --> CA{2. Same text, same policy,<br/>labeled before?}
+  CA -->|yes| S[(Save label)]
+  CA -->|no| PH{3. Injection phrase?<br/>e.g. ignore previous instructions}
+  PH -->|yes| R[NEEDS_REVIEW<br/>no model reads it]
+  PH -->|no| J[4. Jev scores every section<br/>and asks: is this an injection?]
+  J -->|injection score high| R
+  J -->|every section clearly unlikely| A[ALLOWED<br/>Claude not needed]
+  J -->|anything else| C[5. Claude Sonnet reads the policy and the posting:<br/>each section matched, unsure or not matched, with quotes]
+  C --> K[6. Code checks every quote is in the posting]
+  K --> D[7. Code sets the label]
+  A --> S
+  R --> S
+  D --> S
+```
+
+At step 7: a VIOLATING section matched with a verified quote gives **VIOLATING**; an unsure section, or §5 alone (unknown employer), gives **NEEDS_REVIEW**; nothing matched gives **ALLOWED**.
+
+**Queue and parallel workers.** Jobs wait in a Postgres table. Live postings go first, then re-labels after a policy change, then Test runs. A worker runs several jobs at once (`WORKER_CONCURRENCY`), and several workers can run side by side (`docker compose up --scale worker=3`), because each job is locked while one worker holds it. A failed job is retried 3 times, then held for review. Each step is saved as it finishes, so a job interrupted by a crash resumes where it stopped and doesn't pay for the models twice.
+
+**Caching, at three levels.**
+- **Same posting, same policy:** a repeat reuses the stored label, at no cost.
+- **Prompt caching:** the policy goes first in Claude's prompt and the posting last, so the policy part is cached and each posting pays only for its own text.
+- **Test results are kept:** when a draft is published, postings its Test already labeled keep those labels; only the rest are labeled again.
+
+**Policy versions.** The policy is data, not code: `policies/v1.yaml` is loaded at start, and new versions are made in the UI. Prompts are built from the version each job runs under.
+
+1. **Draft:** an editor copies the live version and edits it. A draft can be discarded; a published version can't.
+2. **Test:** recent postings are labeled under the draft in the background. A report lists the labels that would flip, and marks which come from the edit and which from Claude answering differently. Nothing anyone sees changes yet.
+3. **Submit, then Publish:** an editor submits; a publisher who didn't edit it publishes (four eyes). New postings use it from the next job, with no restart.
+4. **Re-label:** the last 30 days are labeled again, except what the Test already did. If only a section's outcome changed (VIOLATING to review), labels are decided again in code from the stored answers, with no model calls.
+5. **Roll back:** the old labels are still stored, so they are current again at once.
+
+**Safety.** Injection phrases are checked before any model reads the posting, and a high Jev injection score holds it before Claude does. Quotes are verified word for word. Every endpoint checks the caller's role, and each marketplace sees only its own postings. Request size and rate are capped, and logs never contain posting text. Known gap: an injection worded unlike anything tested could slip past both checks and reach Claude, which has no tools and can't set the label.
+
+## The analyst UI
+
+- **Labels list:** each posting's label, a highlighted evidence quote, the policy sections it matched (click one for its quotes and reasoning) and the reason. Filter by label, section or job id; page through; the filters stay in the address.
+- **A posting:** the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here.
+- **Versions:** edit a draft (add or remove sections, change wording, examples and Jev's question), Test it on as many recent postings as you choose, read the flip report, Submit, Publish, roll back.
+- **Compare:** any two versions side by side, with only the postings that changed.
+- **Workspace panel** (every page): switch role (viewer, editor, two publishers) and the policy version shown, compare the latest with the previous, follow a re-label, and in demo mode send real postings and compare our labels with the dataset's.
+
+### The live demo
+
+After `make demo`, at http://localhost:8000:
+
+1. **New postings arrive:** as Eddie (editor), open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
+2. **Check against the dataset:** switch on "Compare with the dataset's label" to see the dataset's own answer next to ours. The agent never sees it.
+3. **Change the policy:** open Versions, then draft v2 (adds §6). As Eddie, Test it and Submit; as Sam (publisher), Publish. When the re-label is done, "Compare v1 → v2" shows what changed.
+4. **New postings follow the new policy:** send a few more; they are labeled under v2 at once.
+
+## How it's tested
+
+- **Code:** 269 Python tests (API, agent, queue, policy versions, data; the models are faked), 25 UI unit tests and 17 browser tests, on every pull request.
+- **Quality:** the 400 test postings the assignment fixes are never used for tuning; the agent ran on them once under each policy. Hand-written cases (edge cases, injections, policy changes) run with real models on every change to the agent or policy, and a change below its pass mark can't merge.
+- **Load:** real postings through the real API, queue and workers, at the brief's 5x peak and as a burst, with 16 and 48 parallel jobs. This is how Part A's autoscaling (add workers as the queue ages) is checked here: every posting was labeled within 60 seconds, and at 48 the 95th percentile was 6 seconds.
+
+In short: 59 of 100 fraud postings flagged, no legitimate posting labeled VIOLATING, 23% sent to review, $2.75 per 1,000 postings at the real fraud rate. **The detailed results, error analysis and load numbers are in [RESULTS.md](RESULTS.md).**
+
+To run the evaluation yourself:
 
 ```
-posting
-   │
-   ▼
-API          checks the fields, saves the posting, puts a job in the queue
-   │
-   ▼
-worker       takes the job and runs these steps:
-
-  clean      remove hidden HTML text and invisible characters
-  cache      seen this exact posting under this policy before? reuse that label
-  screen     a phrase like "ignore previous instructions"?   → NEEDS_REVIEW, no model reads it
-             Jev, a fast classifier, scores each section:
-               looks like an injection (score ≥ 0.5)?        → NEEDS_REVIEW, no model reads it
-               every section clearly unlikely (< 0.17)?      → ALLOWED, no need for Claude
-  escalate   otherwise Claude (Sonnet 5.5) reads the policy and the posting, and for each section
-             answers matched / unsure / not matched, with quotes
-  check      each quote is looked up in the posting; one that isn't there is thrown away
-  decide     code sets the label from the checked answer:
-               a VIOLATING section matched with a real quote → VIOLATING
-               a section unsure, or §5 (unknown employer)    → NEEDS_REVIEW
-               nothing matched                               → ALLOWED
+make eval-dev        # 50 development postings, a quick check (about $0.20)
+uv run python -m eval.run_eval --split eval --config jev_sonnet --frozen --policy v1   # the 400 (about $1.35)
+make results         # rebuild RESULTS.md from the saved runs
 ```
-
-- Each step is saved as it finishes. A worker that crashes picks up where it stopped, and the UI shows every step of every posting.
-- The policy itself is a file, `policies/v1.yaml`, read while running. Changing it needs no code change (see "Changing the policy").
-
-## How well it works
-
-On the 400 test postings the assignment fixes (100 fraud, never used for tuning), the agent flags 59 of the 100 fraud postings, labels no legitimate posting VIOLATING, sends 23% of postings to review and costs $2.75 per 1,000 at the real fraud rate. Most fraud it misses breaks no rule in the policy; the giveaway is the employer. The numbers, cost, latency and error analysis are in [RESULTS.md](RESULTS.md).
-
-### Run the eval
-
-```
-make eval-dev        # real models on 50 development postings (about $0.20), a quick check
-uv run python -m eval.run_eval --split eval --config jev_sonnet --frozen --policy v1   # the 400 test postings (about $1.35)
-make results         # write RESULTS.md from the saved runs, and check it matches them
-```
-
-Each run saves its per-posting results and a summary in `eval/runs/<name>/`. The 400 test postings are read straight from the dataset file and never enter the database, so the app can't be tuned on them by accident.
 
 ## How the two thresholds were chosen
 
-**When may a posting skip Claude? Jev score under 0.17 on every section.**
-The threshold was set so that Jev agrees with Claude: at most 2% of the postings Claude would flag get cleared without it. On new postings, 1 in 57 was. (`scripts/fit_cutoff.py`)
+**When may a posting skip Claude? Jev score under 0.17 on every section.** Set so that Jev agrees with Claude: at most 2% of the postings Claude would flag get cleared without it. On new postings, 1 in 57 was. (`scripts/fit_cutoff.py`)
 
-**When is a posting held as a possible injection? Jev injection score of 0.5 or more.**
-- **Data:** 3,852 ordinary postings, and 600 postings with one of 10 hand-written injection attempts added. Four of the attempts were kept out of the tuning, to check it works on new wording.
-- **Rule:** the lowest threshold that holds at most 1 in 1,000 ordinary postings. Lowest, because a missed injection could slip through as ALLOWED, while a false alarm only costs one review.
-- **Result:** 3 of 3,852 ordinary postings held, and every injection caught, the new wording included. (`scripts/fit_injection.py`)
-
-## Changing the policy
-
-A new policy version goes through the UI or the API, with no code change:
-
-1. **Draft:** an editor copies the live version and edits it. A draft can be discarded; a published version can't, so every label traces to the policy it used.
-2. **Test:** recent postings are labeled under the draft in the background, and a report lists every posting whose label would change. Nothing anyone reads changes yet.
-3. **Publish:** a publisher who did not edit the draft makes it live (four eyes). New postings are labeled under it from the next job on, with no restart.
-4. **Re-label:** the last 30 days of postings get labels under the new version. Those the Test already labeled are kept, not run again, so a Test of all of them leaves Publish nothing to run. Until a posting is re-labeled, reads say its old label is out of date. The Workspace panel shows the progress.
-5. **Roll back** if needed: the old labels are still stored, so they are current again at once.
-
-`make demo-versions` runs three versions with Claude on 100 postings:
-
-```
-v2   adds §6: a company's text copied, with no profile or logo      13 results change   $0.41
-v3   §5 relaxed: an empty profile is fine when the logo is shown      8 results change   $0.42
-v4   §4 (unrealistic pay) goes to review instead of VIOLATING         1 result changes    $0.00
-```
-
-v4 costs nothing: only what the label does with §4 changed, not what Claude is asked, so the stored answers are simply decided again in code. Asking Claude twice doesn't always give the same answer, so the Test report marks which changes (label or sections) come from the policy edit (7 of 13 for v2) and which are Claude answering differently.
-
-## Safety checks
-
-- **API:** every field is checked, oversized requests are refused, each client sees only its own postings, every endpoint needs the right role (a test checks them all), and logs never contain posting text.
-- **Model:** hidden text is removed before any model reads the posting; the posting is marked as data, not instructions; suspected injections never reach Claude; Claude has no tools; quotes are checked; code sets the label.
-- **UI:** postings are shown as plain text, so HTML inside a posting never runs. Published policies can't be edited.
-- **Known gap:** an injection worded unlike anything tested could score under 0.5 and be cleared. If Jev and its backup both fail, Claude reads postings that only the phrase check has seen.
+**When is a posting held as a possible injection? Jev injection score of 0.5 or more.** The lowest threshold that holds at most 1 in 1,000 ordinary postings: 3,852 ordinary postings and 600 with one of 10 hand-written injection attempts, 4 of them kept out of tuning. Result: 3 ordinary postings held, and every injection caught, the unseen wording included. (`scripts/fit_injection.py`)
 
 ## AWS design (DESIGN.md) vs this repo
 
@@ -147,30 +153,40 @@ v4 costs nothing: only what the label does with §4 changed, not what Claude is 
 | --- | --- |
 | API Gateway and services | One FastAPI app |
 | SQS queues | A `jobs` table in Postgres |
-| ECS workers | The `worker` container |
+| ECS workers with autoscaling | Worker containers: `WORKER_CONCURRENCY` jobs each, `--scale worker=N` |
 | Aurora, S3, AppConfig | Postgres: postings, labels, policy versions, saved steps |
 | Bedrock | Anthropic API (Claude) and TypeSafe (Jev) |
-| Cognito sign-in | Demo users, picked with "Acting as" in the UI |
+| Cognito sign-in | Demo users, picked in the Workspace |
 | CloudFront | The API serves the UI |
-| Webhooks, gradual rollout | Not built: clients ask for labels, and Test runs in the background |
-| Online judges, alerts, the spend cap, the Jev circuit breaker, re-checking only an edited section | Not built: described in DESIGN.md as the production plan |
-
-## Tests
-
-- `make test`: 268 Python tests (with a fake model, so no keys needed) and 25 UI unit tests.
-- `make up-fake seed e2e`: 17 browser tests on the running app, including the role check (a viewer can't edit, an editor can't publish, the person who edited a draft can't publish it) and the live demo.
-- `make guardrails`: shows the API refusing an oversized request, a bad batch item, the wrong role and another client's posting, and holding an injection.
-- Every pull request runs all of these. Changes to the agent or the policy also run real-model checks: hand-written edge cases, injection attempts and policy changes must all pass, and a 50-posting sample must stay above its marks.
+| Webhooks, gradual rollout, online judges, alerts, spend cap | Not built: described in DESIGN.md |
 
 ## Where things are
 
+```mermaid
+flowchart LR
+  MK[Marketplace] -->|/v1| IN[app/api/intake.py]
+  UI[web/src: the React UI] -->|/ui, /policies| AN[app/api/analyst.py<br/>policies.py, demo.py]
+  IN --> ST[app/store.py: all SQL]
+  AN --> ST
+  AN --> VR[app/versions.py<br/>drafts, Test, Publish]
+  VR --> ST
+  ST --> DB[(Postgres<br/>app/schema.sql)]
+  DB -->|jobs| WK[app/worker.py<br/>app/queue.py]
+  WK --> AG[app/agent/graph.py]
+  AG --> M[Jev and Claude<br/>app/agent/llm.py]
+  WK -->|labels| DB
+  EV[eval/run_eval.py] --> AG
+  EV --> RUNS[eval/runs] --> REP[eval/report.py] --> RES[RESULTS.md]
 ```
-app/agent/    the labeling steps: clean, screen, escalate, check, decide
-app/api/      the API: postings (/v1), labels (/ui), policies (/policies)
-app/          queue, worker, database access, policy versions
-policies/     the policy, v1 to v4
-web/          the UI (React)
-eval/         the evaluation: runner, metrics, test suites, results
-scripts/      data split, threshold fitting, demos, sample data
-tests/        Python tests, by area
-```
+
+| Folder | What it is for | Key files |
+| --- | --- | --- |
+| `app/api/` | The HTTP API | `intake.py` (marketplaces: `/v1`), `analyst.py` (the UI: `/ui`), `policies.py` (versions), `demo.py` (live demo), `main.py` (app start, errors, serving the UI) |
+| `app/agent/` | The labeling agent, one file per step | `graph.py` (the steps wired together), `clean.py`, `cache.py`, `screen.py` (Jev and the injection checks), `escalate.py` (Claude), `check.py` and `quotes.py` (verify quotes), `decide.py` (set the label), `llm.py` (model clients and cost) |
+| `app/` | Everything around the agent | `worker.py` and `queue.py` (take and run jobs), `store.py` (all database queries), `versions.py` (draft, Test, Publish, rollback), `auth.py` (roles), `schema.sql` (tables) |
+| `policies/` | The policy as data | `v1.yaml` (the brief's policy), `v2.yaml` to `v4.yaml` (example changes) |
+| `web/src/` | The analyst UI (React) | `pages/` (list, posting, versions, compare), `components/` (panels and widgets), `lib/` (small tested helpers) |
+| `eval/` | Measuring quality | `run_eval.py` (runs the agent on a set), `metrics.py`, `suites/` (hand-written cases), `thresholds.yaml` (pass marks), `runs/` (saved results), `report.py` (writes RESULTS.md) |
+| `scripts/` | One-off tools | data split, threshold fitting, demo set-up, the load test, the guardrail demo |
+| `tests/` | Python tests, by area | `agent/`, `api/`, `queue/`, `policy/`, `db/`, `data/`, `eval/` |
+| `data/` | The dataset split | `splits.json` (which rows are the 400, development and the rest); the CSV is downloaded, not committed |

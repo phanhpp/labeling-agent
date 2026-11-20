@@ -74,9 +74,12 @@ async def read_version(
     async with _conn(request) as conn:
         row = await store.policy_version(conn, name)
         other = await store.policy_version(conn, diff) if diff else None
-    if row is None or (diff and other is None):
-        raise HTTPException(404, "not_found")
-    out = {**_summary(row), "body": row["body"]}
+        if row is None or (diff and other is None):
+            raise HTTPException(404, "not_found")
+        out = {**_summary(row), "body": row["body"]}
+        if row["status"] == "draft" and row["parent"]:
+            # how many postings Publish would label again: a Test of that many leaves Publish nothing to run
+            out["relabel_scope"] = await versions.relabel_scope(conn, row["parent"])
     if other is not None:
         out["diff"] = {"against": diff, "changes": policies.diff(other["body"], row["body"])}
     return out
@@ -95,6 +98,13 @@ async def edit_draft(name: str, edit: DraftEdit, request: Request, user: User = 
     async with _conn(request) as conn:
         row = await _run(versions.update_draft(conn, name, edit.body, user.name))
     return _summary(row)
+
+
+@router.delete("/drafts/{name}")
+async def discard_draft(name: str, request: Request, user: User = Depends(require(*EDIT))):
+    """Delete a draft and its Test. Published versions can't be deleted."""
+    async with _conn(request) as conn:
+        return await _run(versions.discard_draft(conn, name))
 
 
 @router.post("/drafts/{name}/test", status_code=202)

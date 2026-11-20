@@ -56,3 +56,11 @@ def thread_id(posting_id: int, policy_version: str, model_version: str) -> str:
     """One thread per (posting, policy version, model version). A draft passes its content hash as
     the version, so an edited draft never resumes an old run."""
     return f"{posting_id}:{policy_version}:{model_version}"
+
+
+async def delete_threads(conn: AsyncConnection, thread_ids: list[str]) -> None:
+    """Delete threads inside the caller's transaction (the same three tables adelete_thread clears).
+    Used when a draft is discarded, so its jobs, labels and checkpoints go together."""
+    if thread_ids:
+        for table in ("checkpoints", "checkpoint_blobs", "checkpoint_writes"):
+            await conn.execute(f"DELETE FROM {table} WHERE thread_id = ANY(%s)", (thread_ids,))

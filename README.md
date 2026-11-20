@@ -33,6 +33,7 @@ open http://localhost:8000
 ```
 
 - **Without keys** it still starts: postings are accepted and wait in a queue, and the page says labeling is off.
+- **With keys, ready for a demo:** `make demo` starts from an empty database, labels 100 real development postings with Claude (about $0.35), and loads `policies/v2.yaml` (adds §6) as an untested draft v2, to Test and publish in the UI.
 - **To try it with no keys and no cost:** `make up-fake seed`. A fake model labels by simple word rules, and `seed` adds 14 sample postings, an analyst decision and a draft policy.
 - **To stop:** `make down`. Your data is kept for next time.
 - **To reset the demo:** `make reset` deletes the local demo database (the Docker volume on your machine), so the next `make up` starts empty. The demo scripts need this.
@@ -128,11 +129,11 @@ The threshold was set so that Jev agrees with Claude: at most 2% of the postings
 
 A new policy version goes through the UI or the API, with no code change:
 
-1. **Draft:** an editor copies the live version and edits it.
-2. **Test:** recent postings are labeled under the draft in the background, and a report lists every posting whose label would change.
-3. **Publish:** a publisher who did not edit the draft makes it live (four eyes).
-4. **Re-label:** recent postings get labels under the new version. Until then, reads say the old label is out of date.
-5. **Roll back** if needed: the old labels are still stored.
+1. **Draft:** an editor copies the live version and edits it. A draft can be discarded; a published version can't, so every label traces to the policy it used.
+2. **Test:** recent postings are labeled under the draft in the background, and a report lists every posting whose label would change. Nothing anyone reads changes yet.
+3. **Publish:** a publisher who did not edit the draft makes it live (four eyes). New postings are labeled under it from the next job on, with no restart.
+4. **Re-label:** the last 30 days of postings get labels under the new version. Those the Test already labeled are kept, not run again, so a Test of all of them leaves Publish nothing to run. Until a posting is re-labeled, reads say its old label is out of date. The Workspace panel shows the progress.
+5. **Roll back** if needed: the old labels are still stored, so they are current again at once.
 
 `make demo-versions` runs three versions with Claude on 100 postings:
 

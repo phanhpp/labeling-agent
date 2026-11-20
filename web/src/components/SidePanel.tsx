@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Link, useNavigate } from "react-router";
 import { useShared, type Tagged } from "../context";
 import { USERS } from "../roles";
+import { RelabelProgress, useRelabel } from "./Relabel";
 
 const tagWords = (v: Tagged) => (v.tags.length ? ` (${v.tags.join(", ")})` : "");
 
@@ -25,6 +26,7 @@ export function SidePanel() {
   const published = versions.filter((v) => v.status !== "draft");
   const shown = viewing ?? live;
   const shownVersion = versions.find((v) => v.name === shown);
+  const relabel = useRelabel(live); // after a publish, watch the re-label from any page
 
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -85,6 +87,7 @@ export function SidePanel() {
           {previous && latest ? `Each posting's label under ${previous} (previous) next to ${latest} (latest).` : "Needs two published versions."}{" "}
           <Link to="/versions">Manage versions</Link>
         </p>
+        <RelabelProgress relabel={relabel} compact />
       </section>
 
       <div className="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" onPointerDown={startResize} title="Drag to resize" />

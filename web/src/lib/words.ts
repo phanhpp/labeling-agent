@@ -59,3 +59,20 @@ export function modelName(modelVersion: string): string {
   const claude = modelVersion.includes("claude-sonnet") ? "Claude Sonnet 5.5" : modelVersion.includes("claude-haiku") ? "Claude Haiku 5.5" : "the model";
   return screen && screen !== "none" ? `${screen === "jev" ? "Jev" : "Haiku"} + ${claude}` : claude;
 }
+
+// Where a version's re-label stands, in one sentence: what Publish kept from the Test, what it
+// labeled again (in code at $0, or with the models), and what is still waiting.
+export type RelabelCounts = { kept_from_test: number; relabeled: number; in_code: number; waiting: number; total: number; cost_usd: number };
+
+export const dollars = (usd: number) => (usd > 0 && usd < 0.01 ? "under $0.01" : `$${usd.toFixed(2)}`);
+
+export function relabelSentence(version: string, r: RelabelCounts): string {
+  const done = r.kept_from_test + r.relabeled;
+  const head = r.waiting
+    ? `Labeling recent postings again under ${version}: ${done} of ${r.total} done.`
+    : `All ${r.total} recent postings are labeled under ${version}.`;
+  const parts = [`${r.kept_from_test} kept from the Test`];
+  parts.push(r.in_code ? `${r.relabeled} labeled again (${r.in_code} decided in code at $0)` : `${r.relabeled} labeled again`);
+  if (r.waiting) parts.push(`${r.waiting} waiting`);
+  return `${head} ${parts.join(", ")}. Cost ${r.waiting ? "so far " : ""}${dollars(r.cost_usd)}.`;
+}

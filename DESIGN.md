@@ -118,4 +118,6 @@ Quality is checked at three points: before a change ships, on every post, and af
 - **Human annotation:** Jev clears most posts without Claude reading them, and nothing else would catch a fraud it wrongly cleared, so 1% of those go to an analyst anyway. How often analysts overturn a label is tracked per policy section. Low judge scores and overturned labels land in an annotation queue, and confirmed mistakes join the hand-written cases, so the tests grow from real errors.
 - **Drift:** daily per policy version: label rates, how much Jev clears, injection flags.
 
+**Calibration.** Jev's cut-offs are fitted on labeled development data: the clearing cut-off so Jev clears almost nothing Claude would flag, the injection threshold so it holds almost no ordinary post. They are re-checked when a policy changes or the audit finds misses. The LLM judges are checked against people: analysts label a sample of close calls, and a judge whose scores disagree with them has its pass line or question adjusted.
+
 **Alerts (LangSmith and CloudWatch, to Slack).** Quality: judge scores dropping, overturned labels rising. System: errors, p95 over 45 s, a stalled queue, Jev failing, spend ahead of budget.

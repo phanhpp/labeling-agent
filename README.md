@@ -68,28 +68,32 @@ Every `make` target is one or two plain commands; see the [Makefile](Makefile).
 
 ## What Part B does
 
-**How a posting is labeled.** The API saves it and queues a job; a worker runs the agent:
+**How a posting is labeled.** The API saves each posting and queues a job; a worker runs these steps:
 
 ```mermaid
-flowchart TB
-  P[Posting arrives at the API] --> Q[[Job queue]] --> W[Worker runs the agent]
-  W --> CL[1. Clean: remove hidden text]
-  CL --> CA{2. Same text, same policy,<br/>labeled before?}
-  CA -->|yes| S[(Save label)]
-  CA -->|no| PH{3. Injection phrase?<br/>e.g. ignore previous instructions}
-  PH -->|yes| R[NEEDS_REVIEW<br/>no model reads it]
-  PH -->|no| J[4. Jev scores every section<br/>and asks: is this an injection?]
-  J -->|injection score high| R
-  J -->|every section clearly unlikely| A[ALLOWED<br/>Claude not needed]
-  J -->|anything else| C[5. Claude Sonnet reads the policy and the posting:<br/>each section matched, unsure or not matched, with quotes]
-  C --> K[6. Code checks every quote is in the posting]
-  K --> D[7. Code sets the label]
-  A --> S
-  R --> S
-  D --> S
+flowchart LR
+  P[Posting] --> CL[1. Clean]
+  CL --> CA{2. In cache?}
+  CA -->|yes, reuse it| O[(Output:<br/>label + evidence)]
+  CA -->|no| G{3. Injection<br/>guardrail}
+  G -->|caught| R[NEEDS_REVIEW]
+  G -->|clear| J{4. Jev<br/>screen}
+  J -->|injection| R
+  J -->|all clearly fine| A[ALLOWED]
+  J -->|else| C[5. Claude reads<br/>policy + posting]
+  C --> K[6. Quotes<br/>checked] --> D[7. Label set<br/>in code]
+  A --> O
+  R --> O
+  D --> O
 ```
 
-At step 7: a VIOLATING section matched with a verified quote gives **VIOLATING**; an unsure section, or §5 alone (unknown employer), gives **NEEDS_REVIEW**; nothing matched gives **ALLOWED**.
+1. **Clean:** remove hidden text and invisible characters.
+2. **In cache?** The same text under the same policy was labeled before: reuse that label, no models called.
+3. **Injection guardrail:** a known phrase such as "ignore previous instructions" sends the post to review, unread by any model.
+4. **Jev screen:** a fast model scores each policy section, plus "is this an injection?". A high injection score goes to review; every section clearly fine is ALLOWED without Claude.
+5. **Claude** (Sonnet) reads the policy and the posting, and answers each section matched, unsure or not matched, with quotes.
+6. **Quotes checked:** each quote must be in the posting, word for word; any that isn't is dropped.
+7. **Label set in code:** a VIOLATING section matched with a verified quote gives **VIOLATING**; an unsure section, or §5 alone (unknown employer), gives **NEEDS_REVIEW**; nothing matched gives **ALLOWED**.
 
 **Queue and parallel workers.** Jobs wait in a Postgres table. Live postings go first, then re-labels after a policy change, then Test runs. A worker runs several jobs at once (`WORKER_CONCURRENCY`), and several workers can run side by side (`docker compose up --scale worker=3`), because each job is locked while one worker holds it. A failed job is retried 3 times, then held for review. Each step is saved as it finishes, so a job interrupted by a crash resumes where it stopped and doesn't pay for the models twice.
 

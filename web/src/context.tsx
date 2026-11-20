@@ -25,6 +25,10 @@ type Shared = {
   panelWidth: number;
   setPanelWidth: (px: number) => void;
   refreshVersions: () => void;
+  compareDataset: boolean; // demo: show the dataset's label next to ours (off: the pages look like production)
+  setCompareDataset: (on: boolean) => void;
+  lastRun: number | null; // demo: the last "Send real postings" run (its batch id)
+  setLastRun: (batch: number) => void;
 };
 const Context = createContext<Shared | null>(null);
 
@@ -95,6 +99,17 @@ export function SharedProvider({ children }: { children: ReactNode }) {
     setPanelOpenState(open);
   };
 
+  const [compareDataset, setCompareState] = useState(() => stored("compare-dataset", "off") === "on");
+  const setCompareDataset = (on: boolean) => {
+    store("compare-dataset", on ? "on" : "off");
+    setCompareState(on);
+  };
+  const [lastRun, setLastRunState] = useState<number | null>(() => Number(stored("live-run", "")) || null);
+  const setLastRun = (batch: number) => {
+    store("live-run", String(batch));
+    setLastRunState(batch);
+  };
+
   const refreshVersions = useCallback(() => {
     api.versions().then((list) => setVersions(tagVersions(list)), () => {});
   }, []);
@@ -120,6 +135,7 @@ export function SharedProvider({ children }: { children: ReactNode }) {
         user, setUser, versions, live, latest, previous,
         viewing: shown === live ? null : shown, setViewing,
         sections, panelOpen, setPanelOpen, panelWidth, setPanelWidth, refreshVersions,
+        compareDataset, setCompareDataset, lastRun, setLastRun,
       }}
     >
       {children}

@@ -106,6 +106,66 @@ async def new_batch(conn: AsyncConnection, client_id: str) -> int:
     return row["id"]
 
 
+async def save_dataset_label(conn: AsyncConnection, posting_id: int, fraudulent: bool) -> None:
+    """Demo only: the dataset's label for a posting the live demo sent (see app/demo.py)."""
+    await conn.execute(
+        "INSERT INTO dataset_labels (posting_id, fraudulent) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (posting_id, fraudulent),
+    )
+
+
+async def batch_summary(conn: AsyncConnection, batch_id: int) -> dict | None:
+    """A batch for the analysts: how far its labeling got, the labels, how many skipped Claude, cost
+    and latency, and (for a live-demo run) how the labels compare with the dataset's."""
+    batch = await (await conn.execute("SELECT * FROM batches WHERE id = %s", (batch_id,))).fetchone()
+    if batch is None:
+        return None
+    rows = await (
+        await conn.execute(
+            """
+            SELECT j.status, l.label, l.reason_codes, l.cost_usd, l.latency_ms, ds.fraudulent
+            FROM jobs j
+            LEFT JOIN LATERAL (
+                SELECT * FROM labels WHERE posting_id = j.posting_id AND policy_version = j.policy_version
+                ORDER BY created_at DESC LIMIT 1
+            ) l ON true
+            LEFT JOIN dataset_labels ds ON ds.posting_id = j.posting_id
+            WHERE j.batch_id = %s
+            """,
+            (batch_id,),
+        )
+    ).fetchall()
+    labeled = [r for r in rows if r["label"] is not None]
+    latencies = sorted(r["latency_ms"] for r in labeled)
+    flagged = {"VIOLATING", "NEEDS_REVIEW"}
+    with_dataset = [r for r in labeled if r["fraudulent"] is not None]
+    return {
+        "batch_id": batch_id,
+        "created_at": batch["created_at"],
+        "postings": len(rows),
+        "labeled": len(labeled),
+        "waiting": sum(r["status"] in ("queued", "running") for r in rows),
+        "labels": {
+            k: sum(r["label"] == k for r in labeled) for k in ("VIOLATING", "NEEDS_REVIEW", "ALLOWED")
+        },
+        "without_claude": sum(
+            bool({"cleared_by_screen", "injection", "cached"} & set(r["reason_codes"])) for r in labeled
+        ),
+        "cost_usd": round(float(sum(r["cost_usd"] for r in labeled)), 4),
+        "latency_ms": {
+            "p50": latencies[len(latencies) // 2] if latencies else None,
+            "p95": latencies[min(len(latencies) - 1, int(len(latencies) * 0.95))] if latencies else None,
+        },
+        "dataset": None
+        if not any(r["fraudulent"] is not None for r in rows)
+        else {
+            "fraud": sum(bool(r["fraudulent"]) for r in rows),
+            "caught": sum(bool(r["fraudulent"]) and r["label"] in flagged for r in with_dataset),
+            "false_alarms": sum(r["fraudulent"] is False and r["label"] in flagged for r in with_dataset),
+        },
+    }
+
+
 async def batch_progress(conn: AsyncConnection, batch_id: int, client_id: str) -> dict | None:
     owner = await (
         await conn.execute("SELECT id FROM batches WHERE id = %s AND client_id = %s", (batch_id, client_id))
@@ -336,20 +396,27 @@ async def record_decision(conn, posting_id: int, label: str, note: str, analyst:
 # ---------------------------------------------------------------- analyst reads
 
 # The newest label per posting under one version, with the latest analyst decision.
+# The batch is a scope (a live-demo run), not a chip: the chip counts are counted within it.
 _BROWSE = """
 WITH current AS (
     SELECT DISTINCT ON (posting_id) * FROM labels WHERE policy_version = %(version)s
+      AND (%(batch)s::bigint IS NULL
+           OR posting_id IN (SELECT posting_id FROM jobs WHERE batch_id = %(batch)s))
     ORDER BY posting_id, created_at DESC
 )
 SELECT l.id, l.posting_id, p.job_id, p.client_id, p.raw->>'title' AS title, l.label, l.sections,
        l.confidence, l.rationale, l.reason_codes, l.policy_version, l.created_at, l.findings,
-       d.label AS decision
+       d.label AS decision, ds.fraudulent AS dataset_fraud
 FROM current l
 JOIN postings p ON p.id = l.posting_id
 LEFT JOIN LATERAL (
     SELECT label FROM decisions WHERE posting_id = l.posting_id ORDER BY created_at DESC LIMIT 1
 ) d ON true
+LEFT JOIN dataset_labels ds ON ds.posting_id = l.posting_id
 """
+
+# A label flags fraud when it is VIOLATING or NEEDS_REVIEW: the same rule as the eval.
+_FLAGGED = "label IN ('VIOLATING', 'NEEDS_REVIEW')"
 
 
 async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset: int) -> dict:
@@ -360,8 +427,10 @@ async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset
         "(%(section)s::text IS NULL OR %(section)s = ANY(l.sections))",
         "(%(reason)s::text IS NULL OR %(reason)s = ANY(l.reason_codes))",
         "(%(job_id)s::text IS NULL OR p.job_id = %(job_id)s)",
+        # only where the model and the dataset disagree (demo comparison)
+        f"(NOT %(disagree)s OR (ds.fraudulent IS NOT NULL AND ds.fraudulent <> (l.{_FLAGGED})))",
     ]
-    params = {**filters, "limit": limit, "offset": offset}
+    params = {"batch": None, "disagree": False, **filters, "limit": limit, "offset": offset}
     rows = await (
         await conn.execute(
             _BROWSE + " WHERE " + " AND ".join(where) + " ORDER BY l.created_at DESC, l.id DESC"
@@ -382,10 +451,14 @@ async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset
             params,
         )
     ).fetchall()
+    compare = filters.get("compare", False)
     for row in rows:
         row["policy_match"] = policy_match(row.pop("findings"))
         row["evidence_preview"] = evidence_preview(row["policy_match"])
-    return {
+        fraud = row.pop("dataset_fraud")
+        if compare:
+            row["dataset"] = None if fraud is None else ("fraud" if fraud else "legitimate")
+    out = {
         "items": rows,
         "total": total["n"],
         "counts": {
@@ -393,6 +466,19 @@ async def browse_labels(conn: AsyncConnection, filters: dict, limit: int, offset
             "section": {r["section"]: r["n"] for r in by_section},
         },
     }
+    if compare:  # for the rows the filters select
+        agreement = await (
+            await conn.execute(
+                f"""SELECT count(*) FILTER (WHERE dataset_fraud IS NOT NULL) AS with_dataset,
+                       count(*) FILTER (WHERE dataset_fraud) AS fraud,
+                       count(*) FILTER (WHERE dataset_fraud AND {_FLAGGED}) AS caught,
+                       count(*) FILTER (WHERE dataset_fraud = false AND {_FLAGGED}) AS false_alarms
+                FROM ({_BROWSE} WHERE {" AND ".join(where)}) t""",
+                params,
+            )
+        ).fetchone()
+        out["dataset"] = dict(agreement)
+    return out
 
 
 def policy_match(findings: list[dict]) -> list[dict]:
@@ -419,7 +505,8 @@ def evidence_preview(match: list[dict]) -> dict | None:
 
 
 async def label_detail(conn: AsyncConnection, label_id: int) -> dict | None:
-    """One label with everything the decision page shows."""
+    """One label with everything the decision page shows (and, for a posting the live demo sent, the
+    dataset's label, which the page shows only with "Compare with dataset" on)."""
     label = await (await conn.execute("SELECT * FROM labels WHERE id = %s", (label_id,))).fetchone()
     if label is None:
         return None
@@ -441,8 +528,14 @@ async def label_detail(conn: AsyncConnection, label_id: int) -> dict | None:
     job = await latest_job(conn, label["posting_id"])
     # Exactly what the marketplace gets for this posting now (the read rule), shown on the page.
     api_answer = await read_label(conn, post["client_id"], post["job_id"])
+    dataset = await (
+        await conn.execute(
+            "SELECT fraudulent FROM dataset_labels WHERE posting_id = %s", (label["posting_id"],)
+        )
+    ).fetchone()
     return {
         **output_of(label),
+        "dataset": None if dataset is None else ("fraud" if dataset["fraudulent"] else "legitimate"),
         "api_answer": as_json_safe(api_answer),
         "id": label["id"],
         "posting_id": label["posting_id"],

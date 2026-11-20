@@ -19,6 +19,9 @@ x-app: &app
     # From the shell or .env, so `LLM_BACKEND=fake docker compose up` runs with no model calls.
     LLM_BACKEND: ${LLM_BACKEND:-real}
     AGENT_CONFIG: ${AGENT_CONFIG:-}
+    # The live demo's "Send real postings" button (app/demo.py). Set DEMO_MODE=false to hide it.
+    DEMO_MODE: ${DEMO_MODE:-true}
+    WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-8}  # jobs at a time: a live-demo run of 30 takes about a minute
 
 services:
   db:
@@ -41,6 +44,8 @@ services:
     <<: *app
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./data:/srv/data:ro  # the dataset CSV and the splits, read by the live demo only
     depends_on:
       db:
         condition: service_healthy

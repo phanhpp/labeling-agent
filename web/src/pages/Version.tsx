@@ -107,7 +107,7 @@ function PublishedNote({ policy, notify, onChange }: { policy: Policy; notify: (
         be changed, so every label can be traced to the exact policy it used.
         {policy.status === "live" && " To change the policy, create a draft from it."}
       </p>
-      <RelabelProgress relabel={relabel} />
+      <RelabelProgress relabel={relabel} from={policy.parent} />
       {relabel && !relabel.relabel?.total && <p className="muted">{relabel.labels} postings labeled under {policy.name}.</p>}
       <div className="buttons">
         {policy.status === "live" && user.role !== "viewer" && (

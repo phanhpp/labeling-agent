@@ -231,3 +231,30 @@ test("an editor discards a draft; published versions have no discard", async ({ 
   await page.goto("/versions/v2");
   await expect(page.getByRole("button", { name: "Discard this draft" })).toHaveCount(0);
 });
+
+// Last: it adds postings. It needs the dataset CSV (make demo downloads it; CI doesn't have it).
+test("the live demo sends real postings, follows the run, and compares with the dataset", async ({ page, request }) => {
+  const health = await (await request.get("/health")).json();
+  test.skip(!health.demo?.enabled || !health.demo?.dataset, "needs DEMO_MODE and the dataset CSV");
+  await page.goto("/");
+  await actAs(page, "editor");
+  const panel = page.getByTestId("live-run");
+  await panel.getByLabel("How many postings to send").selectOption("10");
+  await panel.getByRole("button", { name: "Send 10 postings" }).click();
+  const result = page.getByTestId("run-result");
+  await expect(result).toContainText("all 10 labeled", { timeout: 30_000 });
+  await expect(result).toContainText(/Caught \d+ of [1-9]\d* fraud/); // 25% fraud: at least one sent
+
+  await result.getByRole("button", { name: "Show this run in the list" }).click();
+  await expect(page).toHaveURL(/batch=\d+/);
+  await expect(page.getByTestId("run-scope")).toContainText("all 10 labeled");
+  await expect(page.locator("tbody tr")).toHaveCount(10);
+
+  await panel.getByText("Compare with the dataset's label").click();
+  await expect(page.getByTestId("dataset-summary")).toContainText("10 postings with a dataset label");
+  await expect(page.locator("td.dataset-cell").first()).toContainText(/fraud|legitimate/);
+  await page.locator("tbody tr").first().locator("td.why").click();
+  await expect(page.getByTestId("dataset-line")).toContainText("The dataset marks this posting as");
+  await page.getByText("Compare with the dataset's label").click(); // off again: the page looks like production
+  await expect(page.getByTestId("dataset-line")).toHaveCount(0);
+});

@@ -45,13 +45,25 @@ export type LabelRow = {
   confidence: number; rationale: string; reason_codes: string[]; policy_version: string; decision: string | null;
   policy_match: Match[];
   evidence_preview: { section: string; text?: string; missing?: string[] } | null;
+  dataset?: DatasetLabel; // only with "Compare with dataset" on
 };
-export type Browse = { version: string; items: LabelRow[]; total: number; counts: { label: Record<string, number>; section: Record<string, number> } };
+export type DatasetLabel = "fraud" | "legitimate" | null;
+export type Browse = {
+  version: string; items: LabelRow[]; total: number; counts: { label: Record<string, number>; section: Record<string, number> };
+  dataset?: { with_dataset: number; fraud: number; caught: number; false_alarms: number };
+};
+export type LiveRun = { batch_id: number; postings: number; fraud: number; seed: number; mix: "real" | "more_fraud" };
+export type BatchSummary = {
+  batch_id: number; created_at: string; postings: number; labeled: number; waiting: number;
+  labels: Record<"VIOLATING" | "NEEDS_REVIEW" | "ALLOWED", number>; without_claude: number; cost_usd: number;
+  latency_ms: { p50: number | null; p95: number | null };
+  dataset: { fraud: number; caught: number; false_alarms: number } | null;
+};
 export type Detail = {
   id: number; posting_id: number; job_id: string; client_id: string; label: string; policy_sections: string[];
   rationale: string; confidence: number; policy_version: string; reason_codes: string[]; findings: Finding[];
   screen: Record<string, any> | null; model_version: string; cleaned: Record<string, string>; facts: Record<string, any>;
-  cost_usd: number; latency_ms: number; labeled_at: string;
+  cost_usd: number; latency_ms: number; labeled_at: string; dataset: DatasetLabel;
   history: { id: number; policy_version: string; label: string; sections: string[]; created_at: string }[];
   decisions: { label: string; note: string; analyst: string; policy_version: string; created_at: string }[];
   job: { status: string } | null;
@@ -80,16 +92,24 @@ export type Relabel = {
   version: string; status: string; labels: number; labels_without_a_model_call: number; cost_usd: number;
   jobs: Record<string, number>; relabel: RelabelCounts | null; new_postings: number;
 };
-export type Health = { live_labeling: boolean; missing_keys: string[]; agent_config: string; llm_backend: string };
+export type Health = {
+  live_labeling: boolean; missing_keys: string[]; agent_config: string; llm_backend: string;
+  demo: { enabled: boolean; dataset: boolean };
+};
 
 export const api = {
   health: () => request<Health>("/health"),
-  labels: (filters: Filters) => {
+  labels: (filters: Filters, compare = false) => {
     const { limit, offset } = pageWindow(filters);
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     for (const key of ["label", "section", "job_id", "version"] as const) if (filters[key]) params.set(key, filters[key]!);
+    if (filters.batch) params.set("batch", String(filters.batch));
+    if (compare) params.set("compare", "true");
+    if (compare && filters.disagree) params.set("disagree", "true");
     return request<Browse>(`/ui/labels?${params}`);
   },
+  liveRun: (n: number, mix: LiveRun["mix"]) => request<LiveRun>("/demo/live-run", json("POST", { n, mix })),
+  batch: (id: number) => request<BatchSummary>(`/ui/batches/${id}`),
   label: (id: string) => request<Detail>(`/ui/labels/${id}`),
   steps: (postingId: number) => request<Steps>(`/ui/postings/${postingId}/steps`),
   decide: (id: number, label: string, note: string) => request(`/ui/labels/${id}/decision`, json("POST", { label, note })),
@@ -119,6 +139,7 @@ const MESSAGES: Record<string, string> = {
   parent_not_live: "The version this draft started from is no longer live. Create the draft again.",
   not_a_draft: "Published versions can't be edited or discarded.",
   test_running: "The Test is still running. Stop it, wait a few seconds, then try again.",
+  dataset_missing: "The dataset isn't downloaded yet. Run make demo (or uv run python -m scripts.load_data) first.",
   draft_in_use: "Labels under another version were copied from this draft's Test, so it can't be discarded.",
   name_taken: "A version with that name already exists.",
   not_retired: "Only a version that was live before can be made live again.",

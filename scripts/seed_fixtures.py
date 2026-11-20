@@ -49,7 +49,7 @@ def main() -> None:
     if not health["live_labeling"]:
         sys.exit(f"not labeling: missing {', '.join(health['missing_keys'])}")
     if any(v["name"] == "v2" for v in editor.get("/policies").json()):
-        sys.exit("already seeded (v2 exists): docker compose down -v, then up again")
+        sys.exit("already seeded (v2 exists): make reset up-fake")
 
     postings = [json.loads(line) for line in FIXTURES.read_text().splitlines() if line]
     out = marketplace.post("/v1/postings/batch", json={"postings": postings})

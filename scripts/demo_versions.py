@@ -5,7 +5,7 @@ flip report, another person publishes it, and the re-label runs. It prints what 
 model calls it took and what it cost. v4 changes only an effect, so it re-labels in code at $0.
 
 Needs the stack running with model keys (docker compose up) and a fresh database: it labels a dev
-sample under v1 first. To run it again: docker compose down -v && docker compose up -d --wait.
+sample under v1 first. To run it again: make reset up (or docker compose down -v, then up).
 
     uv run python -m scripts.demo_versions --limit 100
 """
@@ -72,7 +72,7 @@ def main() -> None:
         sys.exit(f"not labeling: missing {', '.join(health['missing_keys'])}")
     names = {v["name"] for v in editor.get("/policies").json()}
     if names & set(VERSIONS):
-        sys.exit("the demo has run on this database already: docker compose down -v, then up again")
+        sys.exit("the demo has run on this database already: make reset up")
 
     print(f"v1: labeling {args.limit} dev postings ({health['agent_config']})")
     marketplace.post("/v1/postings/batch", json={"postings": postings("dev", args.limit)}).raise_for_status()

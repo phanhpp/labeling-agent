@@ -1,6 +1,6 @@
 # Short names for the commands in the README. Each line is the plain command; nothing is hidden.
 
-.PHONY: up up-fake seed down api worker web test e2e lint eval-dev demo-versions
+.PHONY: up up-fake seed down reset api worker web test e2e lint eval-dev demo-versions
 
 up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 	docker compose up -d --build --wait
@@ -11,7 +11,10 @@ up-fake:       ## the same, with a fake model: no keys, no cost
 seed:          ## load 14 sample postings, a decision and a draft policy (any running stack)
 	uv run python -m scripts.seed_fixtures
 
-down:          ## stop and delete the database, to start clean
+down:          ## stop everything; the data is kept
+	docker compose down
+
+reset:         ## delete the local demo database (a Docker volume) so the next `make up` starts empty
 	docker compose down -v
 
 api:           ## development: Postgres in Docker, the API from source with reload, on :8000

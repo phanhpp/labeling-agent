@@ -1,0 +1,20 @@
+{
+ "run": "load-burst-48",
+ "started_at": "2026-11-20T23:22:07.962063+00:00",
+ "shape": {
+  "burst": 200
+ },
+ "workers": "3x16",
+ "accepted": 200,
+ "postings": 200,
+ "labeled": 200,
+ "submit_to_label_s": {
+  "p50": 9.2,
+  "p95": 14.8,
+  "max": 17.2
+ },
+ "within_60s": 1.0,
+ "throughput_per_s": 11.62,
+ "failed": 0,
+ "cost_usd": 0.573
+}

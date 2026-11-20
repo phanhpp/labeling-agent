@@ -244,6 +244,38 @@ def build() -> str:
     )
     w("")
 
+    w("## Under load: the 60-second target")
+    w("")
+    w(
+        "The latency above is each posting's working time. The brief's target also counts waiting: 95% labeled within "
+        "60 s of arriving. So real postings went through the real API, queue and workers, at the brief's 5x peak "
+        "(11.6 a second, for 30 s) and as a burst of 200 at once, each timed from arrival to saved label "
+        "(`scripts/load_test.py`)."
+    )
+    w("")
+    w(
+        "| Workers (parallel jobs) | Peak: typical / 95% | Burst of 200: typical / 95% | Labeled per second | All within 60 s |"
+    )
+    w("| --- | --- | --- | --- | --- |")
+    for lanes, label in (("16", "1 worker × 16"), ("48", "3 workers × 16")):
+        peak, burst = summary(f"load-peak-{lanes}"), summary(f"load-burst-{lanes}")
+        pk, bs = peak["submit_to_label_s"], burst["submit_to_label_s"]
+        ok = "yes" if peak["within_60s"] == 1 and burst["within_60s"] == 1 else "no"
+        w(
+            f"| {label} | {pk['p50']} s / {pk['p95']} s | {bs['p50']} s / {bs['p95']} s | {peak['throughput_per_s']} | {ok} |"
+        )
+    w("")
+    p16, p48 = summary("load-peak-16"), summary("load-peak-48")
+    runs = [summary(f"load-{k}") for k in ("peak-16", "burst-16", "peak-48", "burst-48")]
+    w(
+        f"With 16 parallel jobs it labels about {p16['throughput_per_s']} postings a second while 11.6 arrive, so the "
+        "queue grows: the 30-second peak still made it, a longer one wouldn't. With 48 it keeps up and the wait almost "
+        f"disappears ({p48['submit_to_label_s']['p95']} s at the 95th percentile). That is the case for autoscaling on "
+        "queue age in DESIGN.md: add workers when the oldest job has waited about 20 s. "
+        f"No posting failed, and the four runs cost ${sum(r['cost_usd'] for r in runs):.2f}."
+    )
+    w("")
+
     w("## Evidence and confidence")
     w("")
     q = v1s["quotes"]

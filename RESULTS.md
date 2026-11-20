@@ -55,6 +55,17 @@ Precision at 4.8% fraud is what precision would be at the dataset's real rate: o
 - **Claude is the slow step:** the postings it read took 5.8 s and cost $0.0075 on average, which sets the p95. Latency is per posting, on a laptop, with 8 in flight.
 - **These two runs cost** $1.34 and $1.50.
 
+## Under load: the 60-second target
+
+The latency above is each posting's working time. The brief's target also counts waiting: 95% labeled within 60 s of arriving. So real postings went through the real API, queue and workers, at the brief's 5x peak (11.6 a second, for 30 s) and as a burst of 200 at once, each timed from arrival to saved label (`scripts/load_test.py`).
+
+| Workers (parallel jobs) | Peak: typical / 95% | Burst of 200: typical / 95% | Labeled per second | All within 60 s |
+| --- | --- | --- | --- | --- |
+| 1 worker × 16 | 11.0 s / 20.6 s | 15.6 s / 27.2 s | 6.78 | yes |
+| 3 workers × 16 | 1.0 s / 6.2 s | 9.2 s / 14.8 s | 9.89 | yes |
+
+With 16 parallel jobs it labels about 6.78 postings a second while 11.6 arrive, so the queue grows: the 30-second peak still made it, a longer one wouldn't. With 48 it keeps up and the wait almost disappears (6.2 s at the 95th percentile). That is the case for autoscaling on queue age in DESIGN.md: add workers when the oldest job has waited about 20 s. No posting failed, and the four runs cost $3.02.
+
 ## Evidence and confidence
 
 - **Every quote shown is real:** Claude quoted 211 passages as evidence under v1; 204 (97%) were found word for word in the posting. The other 7 were dropped and never shown; a section left without evidence can't make a posting VIOLATING.

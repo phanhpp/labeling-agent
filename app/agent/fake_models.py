@@ -75,8 +75,7 @@ class FakeLabeler:
         matched = [f.section for f in kept if f.status == "matched"]
         answer = RawAnswer(
             findings=kept,
-            rationale=(f"Word rules matched {', '.join(matched)}." if matched else "No word rule matched.")
-            + " (Sample mode: a stand-in for Claude that matches fixed words.)",
+            rationale=f"Word rules matched {', '.join(matched)}." if matched else "No word rule matched.",
         )
         raw = AIMessage(
             content="",

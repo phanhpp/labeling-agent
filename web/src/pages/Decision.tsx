@@ -43,8 +43,8 @@ export default function Decision() {
       <ListNav label={data} />
       <div className="decision">
         <main>
-          <Found label={data} />
           <Posting label={data} />
+          <Found label={data} />
           <Timeline postingId={data.posting_id} />
           <History label={data} />
           <ApiAnswer label={data} />

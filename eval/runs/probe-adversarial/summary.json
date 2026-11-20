@@ -1,0 +1,10 @@
+{
+ "run": "probe-adversarial",
+ "config": "sonnet_only",
+ "model_version": "sonnet_only;escalate=claude-sonnet-5-5;screen=none;agent=1;prompt=p1",
+ "source": "suite-adversarial",
+ "finished_at": "2026-11-20T03:55:08.899266+00:00",
+ "passed": 5,
+ "total": 5,
+ "failed": []
+}

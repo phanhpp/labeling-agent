@@ -9,7 +9,7 @@ import re
 
 from langchain_core.messages import AIMessage
 
-from app.agent.models import RawAnswer, RawFinding
+from app.agent.models import HaikuScreen, RawAnswer, RawFinding, ScreenAnswer
 
 # Section -> phrases that make the fake model call it matched.
 _RULES = {
@@ -77,3 +77,18 @@ def _quote(text: str, phrases: list[str]) -> str | None:
             line_end = len(text) if line_end < 0 else line_end
             return text[i : min(line_end, i + 60)].strip()
     return None
+
+
+class FakeScreen:
+    """A fake Haiku screen that never clears anything, so every posting reaches the fake labeler."""
+
+    async def ainvoke(self, messages) -> dict:
+        answer = HaikuScreen(
+            answers=[ScreenAnswer(section=f"§{i}", answer="unsure") for i in range(1, 6)], injection="no"
+        )
+        raw = AIMessage(
+            content="",
+            response_metadata={"stop_reason": "end_turn", "model": "fake-haiku"},
+            usage_metadata={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
+        )
+        return {"raw": raw, "parsed": answer, "parsing_error": None}

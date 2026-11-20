@@ -150,4 +150,4 @@ sections:
 
 # Jev's cut-off for clearing a posting without Sonnet. Fitted on dev data (scripts/fit_cutoff.py)
 # before v1 goes live. Until then nothing is cleared: every posting goes to Sonnet.
-screen_cut_off: null
+screen_cut_off: 0.17

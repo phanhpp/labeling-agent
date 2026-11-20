@@ -12,7 +12,7 @@ from langchain_core.runnables import Runnable
 
 from app import config
 from app.agent.configs import ESCALATION_PROFILES
-from app.agent.models import RawAnswer
+from app.agent.models import HaikuScreen, RawAnswer
 
 
 @cache
@@ -35,6 +35,22 @@ def chat(profile: str) -> Runnable:
     )
     # json_schema puts the schema in output_config.format: Sonnet 5.5 refuses forced tool use.
     return llm.with_structured_output(RawAnswer, method="json_schema", include_raw=True)
+
+
+@cache
+def screen_chat() -> Runnable:
+    """Haiku as the fallback screen: invoke() returns {"raw", "parsed", "parsing_error"}."""
+    if config.llm_backend() == "fake":
+        from app.agent.fake_models import FakeScreen
+
+        return FakeScreen()
+    llm = ChatAnthropic(
+        model=config.HAIKU,
+        max_tokens=2000,
+        timeout=config.MODEL_TIMEOUT_S,
+        max_retries=config.MODEL_MAX_RETRIES,
+    )
+    return llm.with_structured_output(HaikuScreen, method="json_schema", include_raw=True)
 
 
 def cost_usd(model: str, usage: dict | None) -> float:

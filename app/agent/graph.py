@@ -54,7 +54,8 @@ async def cache_node(state: State, runtime: Runtime[Context]) -> dict:
 
 async def screen_node(state: State, runtime: Runtime[Context]) -> dict:
     ctx = runtime.context
-    return {"screen": await run_screen(_cleaned(state), ctx.policy, ctx.config)}
+    screen, usage = await run_screen(_cleaned(state), ctx.policy, ctx.config)
+    return {"screen": screen, "usage": usage}
 
 
 async def escalate_node(state: State, runtime: Runtime[Context]) -> dict:
@@ -102,6 +103,7 @@ async def decide_node(state: State, runtime: Runtime[Context]) -> dict:
         injection=bool(screen.get("injection_flag")),
         failure=state.get("failure"),
     )
+    decision.reason_codes += screen.get("reason_codes", [])  # screen_fallback, screen_unavailable
     return {"decision": decision.model_dump()}
 
 

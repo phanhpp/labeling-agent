@@ -1,0 +1,46 @@
+# A full eval run, started by hand from the Actions tab: one config on one split.
+# The eval split is the frozen eval (the brief's 400): run it only after the prompt and thresholds
+# are frozen, and change nothing because of what it shows.
+
+name: Eval (full)
+
+on:
+  workflow_dispatch:
+    inputs:
+      split:
+        description: "dev, jev_fit or eval"
+        default: dev
+      config:
+        description: "sonnet_only, jev_sonnet, haiku_sonnet or haiku_only"
+        default: jev_sonnet
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run python -m scripts.load_data
+      - name: Run
+        env:
+          SPLIT: ${{ inputs.split }}
+          CONFIG: ${{ inputs.config }}
+        run: |
+          frozen=""; if [ "$SPLIT" = eval ]; then frozen="--frozen"; fi
+          uv run python -m eval.run_eval --split "$SPLIT" --config "$CONFIG" $frozen --name "ci-full-$SPLIT-$CONFIG"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-full-${{ inputs.split }}-${{ inputs.config }}
+          path: eval/runs/ci-full-*
+          retention-days: 90

@@ -16,7 +16,7 @@ def v1() -> dict:
 def test_v1_is_valid_and_has_the_briefs_five_sections(v1):
     assert [s["code"] for s in v1["sections"]] == ["§1", "§2", "§3", "§4", "§5"]
     assert [s["effect"] for s in v1["sections"]] == ["VIOLATING"] * 4 + ["NEEDS_REVIEW"]
-    assert v1["screen_cut_off"] is None  # fitted later; until then nothing is cleared without Sonnet
+    assert v1["screen_cut_off"] == 0.17  # fitted by scripts/fit_cutoff.py (agreement with Sonnet)
 
 
 def changed(body: dict, edit) -> dict:

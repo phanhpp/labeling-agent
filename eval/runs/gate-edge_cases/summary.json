@@ -1,0 +1,10 @@
+{
+ "run": "gate-edge_cases",
+ "config": "jev_sonnet",
+ "model_version": "jev_sonnet;escalate=claude-sonnet-5-5;screen=jev;agent=1;prompt=p1",
+ "source": "suite-edge_cases",
+ "finished_at": "2026-11-20T04:24:51.455903+00:00",
+ "passed": 8,
+ "total": 8,
+ "failed": []
+}

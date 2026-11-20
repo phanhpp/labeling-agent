@@ -55,15 +55,6 @@ function App() {
     <>
       <Header />
       <div className={`layout ${panelOpen ? "" : "folded"}`} style={{ "--side-w": `${panelWidth}px` } as React.CSSProperties}>
-        {panelOpen ? (
-          <SidePanel />
-        ) : (
-          <div className="rail">
-            <button className="icon" onClick={() => setPanelOpen(true)} aria-label="Open the side panel" title="Open the panel">
-              <Chevron direction="right" />
-            </button>
-          </div>
-        )}
         {/* key: switching user or version reloads the page's data */}
         <Routes key={`${user.key}-${viewing ?? "live"}`}>
           <Route path="/" element={<Browse />} />
@@ -73,6 +64,14 @@ function App() {
           <Route path="/compare" element={<Compare />} />
           <Route path="*" element={<p className="page">Page not found.</p>} />
         </Routes>
+        {panelOpen ? (
+          <SidePanel />
+        ) : (
+          <button className="rail" onClick={() => setPanelOpen(true)} aria-label="Open the side panel" title="Open the workspace">
+            <Chevron direction="left" />
+            <span className="rail-text">Workspace</span>
+          </button>
+        )}
       </div>
     </>
   );

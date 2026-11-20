@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api, type LabelRow } from "../api";
 import { PolicyMatch } from "../components/PolicyMatch";
@@ -12,10 +11,7 @@ import { field } from "../lib/words";
 export default function Browse() {
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
-  const { sections, viewing, panelOpen } = useShared();
-  // With the side panel open, the filters go into it; folded, they sit beside the list.
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  useEffect(() => setSlot(panelOpen ? document.getElementById("sidebar-slot") : null), [panelOpen]);
+  const { sections, viewing } = useShared();
   const navigate = useNavigate();
   const { data, error } = useLoad(() => api.labels({ ...filters, version: filters.version ?? viewing ?? undefined }), [params.toString(), viewing]);
   const set = (next: Filters) => setParams(toParams(next));
@@ -32,7 +28,7 @@ export default function Browse() {
 
   const filtersPanel = (
     <div className="filters" aria-label="Filters">
-      <span className="label-text">Filters</span>
+      <div className="group-head">Filter this list</div>
         <input
           className="search"
           placeholder="Search job id"
@@ -70,8 +66,8 @@ export default function Browse() {
   );
 
   return (
-    <div className={`page browse ${slot ? "filters-in-panel" : ""}`}>
-      {slot ? createPortal(filtersPanel, slot) : <aside>{filtersPanel}</aside>}
+    <div className="page browse">
+      <aside>{filtersPanel}</aside>
 
       <main>
         <ErrorNote error={error} />

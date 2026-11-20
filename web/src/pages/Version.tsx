@@ -6,13 +6,16 @@ import { useShared } from "../context";
 
 export default function Version() {
   const { name = "" } = useParams();
-  const { user } = useShared();
+  const { user, refreshVersions } = useShared();
   // Kept here, not in the panels: publishing turns the draft panel into the live one.
   const [message, setMessage] = useState("");
   const { data, error, reload } = useLoad(async () => {
     const plain = await api.version(name);
     return plain.parent ? api.version(name, plain.parent) : plain;
   }, [name]);
+  // After publishing, rolling back or submitting, the page and the shared version tags (latest,
+  // previous, live: the header and the side panel) both have to be read again.
+  const refresh = () => { reload(); refreshVersions(); };
   if (error) return <div className="page"><ErrorNote error={error} /></div>;
   if (!data) return <div className="page muted">Loading…</div>;
   const isDraft = data.status === "draft";
@@ -28,10 +31,10 @@ export default function Version() {
         {data.published_by && <> · {who(data.published_by, "published")}</>}
       </p>
       {message && <p className="message" role="status">{message}</p>}
-      {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={reload} />}
+      {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={refresh} />}
       {data.diff && <Changes policy={data} />}
-      {isDraft && <DraftTools policy={data} onChange={reload} notify={setMessage} />}
-      {isDraft && user.role !== "viewer" ? <Editor policy={data} onSaved={reload} notify={setMessage} /> : <PolicyText policy={data} />}
+      {isDraft && <DraftTools policy={data} onChange={refresh} notify={setMessage} />}
+      {isDraft && user.role !== "viewer" ? <Editor policy={data} onSaved={refresh} notify={setMessage} /> : <PolicyText policy={data} />}
     </div>
   );
 }
@@ -85,7 +88,7 @@ function PublishedNote({ policy, notify, onChange }: { policy: Policy; notify: (
       )}
       <div className="buttons">
         {policy.status === "live" && user.role !== "viewer" && (
-          <button className="primary" onClick={() => api.createDraft(next).then((v) => navigate(`/versions/${v.name}`), (e) => notify(explain(e)))}>
+          <button className="primary" onClick={() => api.createDraft(next).then((v) => { onChange(); navigate(`/versions/${v.name}`); }, (e) => notify(explain(e)))}>
             Create a draft from {policy.name} (as {next})
           </button>
         )}

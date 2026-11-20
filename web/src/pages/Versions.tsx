@@ -9,7 +9,7 @@ const person = (name: string | null) => (name === "bootstrap" ? "loaded at start
 
 export default function Versions() {
   const { data, error } = useLoad(api.versions, []);
-  const { user } = useShared();
+  const { user, refreshVersions } = useShared();
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
   const live = data?.find((v) => v.status === "live");
@@ -30,7 +30,7 @@ export default function Versions() {
             {user.role !== "viewer" && live && (
               <button
                 className="primary"
-                onClick={() => api.createDraft(next).then((v) => navigate(`/versions/${v.name}`), (err) => setMessage(explain(err)))}
+                onClick={() => api.createDraft(next).then((v) => { refreshVersions(); navigate(`/versions/${v.name}`); }, (err) => setMessage(explain(err)))}
               >
                 Create a draft from {live.name} (as {next})
               </button>

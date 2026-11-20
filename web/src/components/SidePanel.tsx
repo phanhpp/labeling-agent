@@ -15,9 +15,9 @@ export function Chevron({ direction }: { direction: "left" | "right" }) {
   );
 }
 
-// The left panel: who you are, which policy version the pages show, comparing the latest version
-// with the previous one, and below them the current page's own filters (the Labels list puts its
-// filters in #sidebar-slot). It folds to a thin rail, and its right edge can be dragged to resize it.
+// The Workspace panel on the right: who you are, which policy version the pages show, and comparing
+// the latest version with the previous one. It folds to a thin rail, and its left edge can be
+// dragged to resize it.
 export function SidePanel() {
   const { user, setUser, versions, live, latest, previous, viewing, setViewing, setPanelOpen, setPanelWidth } = useShared();
   const navigate = useNavigate();
@@ -28,8 +28,8 @@ export function SidePanel() {
 
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
-    const left = box.current?.getBoundingClientRect().left ?? 0;
-    const move = (ev: PointerEvent) => setPanelWidth(ev.clientX - left);
+    const right = box.current?.getBoundingClientRect().right ?? window.innerWidth;
+    const move = (ev: PointerEvent) => setPanelWidth(right - ev.clientX);
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
@@ -41,9 +41,9 @@ export function SidePanel() {
   return (
     <aside className="side" aria-label="Side panel" ref={box}>
       <div className="side-head">
-        <b>Workspace</b>
+        <div className="group-head" style={{ margin: 0 }}>Workspace <span className="muted small">(every page)</span></div>
         <button className="icon" onClick={() => setPanelOpen(false)} aria-label="Fold the side panel" title="Fold the panel">
-          <Chevron direction="left" />
+          <Chevron direction="right" />
         </button>
       </div>
 
@@ -86,8 +86,6 @@ export function SidePanel() {
           <Link to="/versions">Manage versions</Link>
         </p>
       </section>
-
-      <div id="sidebar-slot" />
 
       <div className="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" onPointerDown={startResize} title="Drag to resize" />
     </aside>

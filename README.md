@@ -93,9 +93,26 @@ All tuning used 300 other postings: 75 fraud, 225 legitimate. This is where they
 
 - **No legitimate posting is labeled VIOLATING.** When the system says VIOLATING, it can show the sentence that breaks the policy.
 - **Analysts check 66 of the 300 postings (22%).** Most are there because the posting has no company profile, so the employer can't be identified (§5). About half of them are fraud.
-- **39 fraud postings are labeled ALLOWED**, because nothing in their text breaks the policy: no fee, no request for bank details, no unrealistic pay. They read like ordinary job ads. Catching them takes a new policy section; v2's §6 is a first step (see "Changing the policy").
+- **39 fraud postings are labeled ALLOWED**, because nothing in their text breaks the policy: no fee, no request for bank details, no unrealistic pay. See below.
 - **Cost: about a third of a cent per posting** ($3.26 per 1,000). Jev clears about half the postings in 0.3 s, almost for free. The rest go to Claude, which takes about 5 s and costs about $0.007 each. Sending every posting to Claude would cost $7.36 per 1,000.
 - **Every piece of evidence shown is a real quote.** Claude quoted 130 sentences as evidence; 125 were found word for word in the posting. The other 5 couldn't be found word for word, so they were discarded and never shown.
+
+### Why 39 fraud postings get through, and how we know
+
+The policy doesn't describe what they do. Three checks:
+
+1. **It isn't the screen.** With Claude reading every posting and no Jev, 38 fraud postings are still ALLOWED. Of the 19 that Jev cleared, Claude on its own would have allowed 18.
+2. **It isn't Claude missing something.** Read one by one, most are copies of real companies' ads (oil and gas firms, hospitals) posted with an empty company profile and no logo. Nothing in them matches §1 to §5.
+3. **Describing them in the policy catches them.** Policy v2 adds one section, §6: *a company's text copied, with no profile of its own and no logo*. On the same 300 postings:
+
+```
+                    fraud (75)                     legitimate (225)
+                VIOLATING  review  ALLOWED     VIOLATING  review  ALLOWED
+v1 (the brief)      5        31      39            0        35      190
+v2 (adds §6)        6        49      20            0        41      184
+```
+
+19 of the 39 are now held for review, 18 of them by §6, while only 6 more legitimate postings are. So the agent follows the policy it is given; what it catches is a policy decision. (§6 was written after reading these 300 postings, so this flatters it: the fair test is the 400, in [RESULTS.md](RESULTS.md).)
 
 ## How the two thresholds were chosen
 

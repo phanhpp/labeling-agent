@@ -133,15 +133,13 @@ After `make demo`, at http://localhost:8000:
 
 **The local database.** The app keeps its data in a Postgres database in Docker on your machine: the postings it was sent, their labels under each policy version, the policy versions and drafts, analysts' decisions, the job queue and each run's saved steps. `make down` keeps it; `make reset` deletes it, so the next start is empty with policy v1. The dataset file and the eval results are never stored there.
 
-**How the dataset is split** (17,880 postings, about 5% fraud; recorded in `data/splits.json`):
+**How the dataset is split.** The dataset has 17,880 postings, about 5% fraud. The split keeps anything used for tuning away from what is reported (recorded in `data/splits.json`):
 
-| Part | Size | Used for |
-| --- | --- | --- |
-| Test set | 400, 100 fraud | The reported results only. Never used for tuning, and never sent to the app |
-| Copies of the test set | 586 | Excluded everywhere: the same ad under another id would leak the test into tuning |
-| Development set | 300, 75 fraud | Tuning prompts and comparing set-ups; `make demo` sends 100 of them |
-| Jev fitting set | 3,552 | Setting Jev's two thresholds |
-| The rest | 13,042 | Not used for tuning. The live demo and the load test draw from every posting outside the test set and its copies |
+- **Test set: 400 postings, 100 fraud.** Fixed by the assignment and used only for the results in RESULTS.md, never for prompts, examples or thresholds. They never enter the app's database, so nothing can be tuned on them by accident.
+- **Their copies: 586 postings.** The dataset repeats some ads under other ids. Tuning on a copy would mean tuning on the test, so every posting whose text matches one of the 400 is excluded everywhere.
+- **Development set: 300 postings, 75 fraud.** Where prompts were tuned and set-ups compared; `make demo` sends 100 of them to the app.
+- **Jev fitting set: 3,552 postings.** Used only to set Jev's two thresholds: when a posting can skip Claude, and when it is held as an injection.
+- **Everything else:** the live demo and the load test draw from any posting outside the 400 and their copies, so a demo never shows a test posting.
 
 ## How it's tested
 

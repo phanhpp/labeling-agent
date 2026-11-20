@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { api, type Relabel } from "../api";
 import { relabelSentence } from "../lib/words";
 
@@ -24,7 +25,8 @@ export function useRelabel(name: string | null): Relabel | null {
 
 // The re-label as a bar and a sentence. Nothing for a version that re-labeled nothing (v1, loaded
 // at startup, or a version made live again by rollback).
-export function RelabelProgress({ relabel, compact = false }: { relabel: Relabel | null; compact?: boolean }) {
+// from: the version it replaced, to point at Compare from → this version.
+export function RelabelProgress({ relabel, compact = false, from = null }: { relabel: Relabel | null; compact?: boolean; from?: string | null }) {
   const r = relabel?.relabel;
   if (!relabel || !r || r.total === 0) return null;
   const done = r.kept_from_test + r.relabeled;
@@ -41,6 +43,13 @@ export function RelabelProgress({ relabel, compact = false }: { relabel: Relabel
             : `${relabel.version}: all ${r.total} recent postings re-labeled, ${r.kept_from_test} kept from the Test.`
           : relabelSentence(relabel.version, r)}
       </p>
+      {!compact && from && (r.waiting ? (
+        <p className="muted small">When it's done, Compare {from} → {relabel.version} lists every label that changed.</p>
+      ) : (
+        <p className="relabel-next">
+          Done. <Link className="btn small" to={`/compare?from=${from}&to=${relabel.version}`}>See what changed: Compare {from} → {relabel.version}</Link>
+        </p>
+      ))}
       {!compact && relabel.new_postings > 0 && (
         <p className="muted small">{relabel.new_postings} new postings labeled under {relabel.version} since it went live.</p>
       )}

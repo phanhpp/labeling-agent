@@ -26,16 +26,41 @@ async def browse(
     reason: str | None = None,
     job_id: str | None = None,
     version: str | None = None,
+    batch: int | None = None,
+    compare: bool = False,
+    disagree: bool = False,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     user: User = Depends(require(*VIEW)),
 ):
-    """Labels under one policy version (the live one by default), newest first, one per posting."""
+    """Labels under one policy version (the live one by default), newest first, one per posting.
+    batch: only the postings one batch sent (a live-demo run). compare: add the dataset's label where
+    the live demo recorded it, and how many the model caught; disagree: only where they differ."""
     async with _conn(request) as conn:
         version = version or (await store.live_policy(conn))["name"]
-        filters = {"version": version, "label": label, "section": section, "reason": reason, "job_id": job_id}
+        filters = {
+            "version": version,
+            "label": label,
+            "section": section,
+            "reason": reason,
+            "job_id": job_id,
+            "batch": batch,
+            "compare": compare or disagree,
+            "disagree": disagree,
+        }
         result = await store.browse_labels(conn, filters, limit, offset)
     return {"version": version, **result}
+
+
+@router.get("/batches/{batch_id}")
+async def batch(batch_id: int, request: Request, user: User = Depends(require(*VIEW))):
+    """A batch's progress and result: labels, how many skipped Claude, cost, latency, and for a
+    live-demo run how the labels compare with the dataset's."""
+    async with _conn(request) as conn:
+        out = await store.batch_summary(conn, batch_id)
+    if out is None:
+        raise HTTPException(404, "not_found")
+    return out
 
 
 @router.get("/compare")

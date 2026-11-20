@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api, type LabelRow } from "../api";
 import { PanelToggle, usePanelShortcut } from "../components/PanelToggle";
+import { DatasetCell } from "../components/Dataset";
+import { useBatch } from "../components/LiveRun";
 import { PolicyMatch } from "../components/PolicyMatch";
 import { ErrorNote, LabelBadge, color, useLoad } from "../components/ui";
 import { store, stored, useShared } from "../context";
@@ -13,9 +15,18 @@ import { field } from "../lib/words";
 export default function Browse() {
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
-  const { sections, viewing } = useShared();
+  const { sections, viewing, compareDataset } = useShared();
   const navigate = useNavigate();
-  const { data, error } = useLoad(() => api.labels({ ...filters, version: filters.version ?? viewing ?? undefined }), [params.toString(), viewing]);
+  const { data, error, reload } = useLoad(
+    () => api.labels({ ...filters, version: filters.version ?? viewing ?? undefined }, compareDataset),
+    [params.toString(), viewing, compareDataset],
+  );
+  // A live-demo run: its postings only, and the list fills in while they are being labeled.
+  const run = useBatch(filters.batch ?? null);
+  const labeledSoFar = run?.labeled;
+  useEffect(() => {
+    if (labeledSoFar !== undefined) reload();
+  }, [labeledSoFar]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (next: Filters) => setParams(toParams(next));
 
   // Remember this page of the list, so the decision page can go back to it and step through it.
@@ -112,6 +123,29 @@ export default function Browse() {
         <ErrorNote error={error} />
         {data && (
           <>
+            {filters.batch && (
+              <div className="scope" data-testid="run-scope">
+                <b>Run {filters.batch} only</b>
+                {run && <span>{run.waiting ? `${run.labeled} of ${run.postings} labeled, the list fills in as they finish…` : `all ${run.postings} labeled`}</span>}
+                <span className="spacer" />
+                <button className="small" onClick={() => set({ ...filters, batch: undefined, page: undefined })}>Show all postings</button>
+              </div>
+            )}
+            {compareDataset && data.dataset && (
+              <div className="scope dataset" data-testid="dataset-summary">
+                <span>
+                  <b>Against the dataset:</b>{" "}
+                  {data.dataset.with_dataset === 0
+                    ? "none of these postings came from the live demo, so there is no dataset label to compare."
+                    : `caught ${data.dataset.caught} of ${data.dataset.fraud} fraud, ${data.dataset.false_alarms} false alarms (${data.dataset.with_dataset} postings with a dataset label).`}
+                </span>
+                <span className="spacer" />
+                <label className="switch">
+                  <input type="checkbox" checked={!!filters.disagree} onChange={(e) => set({ ...filters, page: undefined, disagree: e.target.checked || undefined })} />
+                  Only where they disagree
+                </label>
+              </div>
+            )}
             <div className="listbar">
               <span>
                 {data.total === 0 ? "No postings" : `${offset + 1}–${Math.min(offset + per, data.total)} of ${data.total}`}
@@ -136,6 +170,7 @@ export default function Browse() {
                 <thead>
                   <tr>
                     <th>Label</th>
+                    {compareDataset && <th className="dataset-col">Dataset says</th>}
                     <th className="hide-sm job-col">Job</th>
                     <th className="col-posting">Posting and its evidence</th>
                     <th className="col-match hide-sm">Policy match</th>
@@ -150,6 +185,7 @@ export default function Browse() {
                         <LabelBadge label={row.label} />
                         {row.decision && <div className="analyst">Analyst: {row.decision.replace("_", " ").toLowerCase()}</div>}
                       </td>
+                      {compareDataset && <td className="dataset-cell"><DatasetCell label={row.label} dataset={row.dataset ?? null} /></td>}
                       <td className="mono job hide-sm">{row.job_id}</td>
                       <td className="title">
                         <Link to={`/labels/${row.id}`} onClick={(e) => e.stopPropagation()}>{row.title}</Link>

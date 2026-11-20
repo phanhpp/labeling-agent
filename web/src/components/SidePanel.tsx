@@ -3,7 +3,10 @@ import { Link, useNavigate } from "react-router";
 import { useShared, type Tagged } from "../context";
 import { USERS } from "../roles";
 import { dragEdge } from "../lib/drag";
+import { api } from "../api";
+import { LiveRunSection } from "./LiveRun";
 import { PanelToggle } from "./PanelToggle";
+import { useLoad } from "./ui";
 import { RelabelProgress, useRelabel } from "./Relabel";
 
 const tagWords = (v: Tagged) => (v.tags.length ? ` (${v.tags.join(", ")})` : "");
@@ -19,6 +22,7 @@ export function SidePanel() {
   const shown = viewing ?? live;
   const shownVersion = versions.find((v) => v.name === shown);
   const relabel = useRelabel(live); // after a publish, watch the re-label from any page
+  const { data: health } = useLoad(api.health, []);
 
   // the panel's right edge is the window's; dragging its left edge sets the width
   const startResize = (e: React.PointerEvent) => {
@@ -73,6 +77,8 @@ export function SidePanel() {
         </p>
         <RelabelProgress relabel={relabel} compact />
       </section>
+
+      {health?.demo?.enabled && <LiveRunSection health={health} />}
 
       <div className="resizer" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" onPointerDown={startResize} title="Drag to resize" />
     </aside>

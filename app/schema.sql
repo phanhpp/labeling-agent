@@ -122,3 +122,12 @@ CREATE TABLE IF NOT EXISTS decisions (
 );
 
 CREATE INDEX IF NOT EXISTS decisions_by_posting ON decisions (posting_id, created_at DESC);
+
+-- Demo only: the dataset's own label (EMSCAD "fraudulent") for postings the live demo sent, so the UI
+-- can compare. Read by the analyst API only: the agent and the worker never read it (a test checks).
+CREATE TABLE IF NOT EXISTS dataset_labels (
+    posting_id  bigint PRIMARY KEY REFERENCES postings (id),
+    fraudulent  boolean NOT NULL,
+    source      text NOT NULL DEFAULT 'emscad',
+    created_at  timestamptz NOT NULL DEFAULT now()
+);

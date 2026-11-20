@@ -17,18 +17,24 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import config, db, store
+from app import demo as demo_data
 from app import queue as jobs
 from app.agent import checkpoints
 from app.agent.configs import missing_keys, worker_config
 from app.agent.graph import build
-from app.api import analyst, intake, policies
+from app.api import analyst, demo, intake, policies
 
 log = logging.getLogger("app.api")
 
 MAX_BODY_BYTES = 10 * 1024 * 1024  # a full batch of 500 dataset postings is about 2.5 MB
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
-API_PREFIXES = ("v1", "ui", "policies", "health", "docs", "openapi.json")
-ROUTERS = [intake.router, analyst.router, policies.router]  # the route-walk test checks every route in these
+API_PREFIXES = ("v1", "ui", "policies", "demo", "health", "docs", "openapi.json")
+ROUTERS = [
+    intake.router,
+    analyst.router,
+    policies.router,
+    demo.router,
+]  # the route-walk test checks every route in these
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
@@ -95,6 +101,8 @@ def create_app(database_url: str | None = None) -> FastAPI:
             "agent_config": agent.name,
             "llm_backend": config.llm_backend(),
             "jobs": queue,
+            # the UI shows the live demo's controls only in demo mode, and says so if the CSV is missing
+            "demo": {"enabled": demo_data.enabled(), "dataset": demo_data.dataset_ready()},
         }
 
     for router in ROUTERS:

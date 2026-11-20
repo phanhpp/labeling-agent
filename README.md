@@ -38,6 +38,15 @@ open http://localhost:8000
 - **To stop:** `make down`. Your data is kept for next time.
 - **To reset the demo:** `make reset` deletes the local demo database (the Docker volume on your machine), so the next `make up` starts empty. The demo scripts need this.
 
+### The live demo
+
+After `make demo`, everything happens in the UI at http://localhost:8000. The Workspace panel on the right holds the controls.
+
+1. **New postings arrive:** as Eddie (editor), use "Live demo: send real postings". Pick 10 to 100 postings and a mix: real (about 5% fraud) or 25% fraud. They are random dataset rows, never the 400 kept for the eval and never one already sent, sent the way the marketplace sends them. The panel shows them being labeled, then the result: labels, how many skipped Claude, cost and time. "Show this run in the list" lists only those postings.
+2. **Check against the dataset:** switch on "Compare with the dataset's label". The list then shows the dataset's own answer next to ours ("caught", "missed fraud", "false alarm"), with a filter for disagreements only. The agent never sees this label; it is stored apart and read only by the analyst pages.
+3. **Change the policy:** open Versions, then draft v2 (adds §6). As Eddie: Test it, then Submit. As Sam (publisher): Publish. The re-label shows its progress; when it is done, "Compare v1 → v2" lists every label that changed.
+4. **New postings follow the new policy:** send a few more postings. They are labeled under v2 straight away, with no restart and no code change.
+
 ### Running the parts separately (development)
 
 Three terminals, each reloading when you change code:

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { api, explain, type Detail, type Steps } from "../api";
 import { ErrorNote, LabelBadge, SectionTag, color, useLoad } from "../components/ui";
 import { useShared } from "../context";
+import { DatasetVerdict } from "../components/Dataset";
 import { segments, spansFor } from "../lib/highlight";
 import { neighbours, readListContext } from "../lib/listContext";
 import { durations, summary } from "../lib/steps";
@@ -120,7 +121,7 @@ function Posting({ label }: { label: Detail }) {
 }
 
 function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void }) {
-  const { user, sections } = useShared();
+  const { user, sections, compareDataset } = useShared();
   const decision = label.decisions[0];
   const why = shortWhy(label);
   return (
@@ -137,6 +138,11 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
           <> · <span className="has-tip" title={confidenceTip(label)}>Confidence {label.confidence.toFixed(2)}</span></>
         )}
       </p>
+      {compareDataset && label.dataset && (
+        <p className="dataset-line" data-testid="dataset-line">
+          The dataset marks this posting as <b>{label.dataset}</b>. <DatasetVerdict label={label.label} dataset={label.dataset} />
+        </p>
+      )}
       {decision && (
         <div className="final" data-testid="analyst-decision">
           <b>Analyst decision: {decision.label.replace("_", " ").toLowerCase()}</b> (final) · {decision.analyst}

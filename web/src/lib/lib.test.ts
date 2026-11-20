@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageWindow, readFilters, sectionCodes, toggle, toParams } from "./filters";
+import { datasetVerdict, pageWindow, readFilters, sectionCodes, toggle, toParams } from "./filters";
 import { segments, spansFor } from "./highlight";
 import { durations, summary } from "./steps";
 
@@ -131,5 +131,20 @@ describe("section filter", () => {
   });
   it("keeps a count for a section the policy no longer has", () => {
     expect(sectionCodes({ "§1": "One" }, { "§6": 2 })).toEqual([["§1", 0], ["§6", 2]]);
+  });
+});
+
+describe("live-demo filters and the dataset comparison", () => {
+  it("keeps a run and the disagreement switch in the URL", () => {
+    const f = readFilters(new URLSearchParams("batch=12&disagree=1&label=ALLOWED"));
+    expect(f).toEqual({ batch: 12, disagree: true, label: "ALLOWED" });
+    expect(toParams(f).toString()).toBe("label=ALLOWED&batch=12&disagree=1");
+    expect(readFilters(new URLSearchParams("batch=x&disagree=yes"))).toEqual({});
+  });
+  it("says how our label compares with the dataset's", () => {
+    expect(datasetVerdict("NEEDS_REVIEW", "fraud")).toBe("caught");
+    expect(datasetVerdict("ALLOWED", "fraud")).toBe("missed fraud");
+    expect(datasetVerdict("VIOLATING", "legitimate")).toBe("false alarm");
+    expect(datasetVerdict("ALLOWED", "legitimate")).toBe("agrees");
   });
 });

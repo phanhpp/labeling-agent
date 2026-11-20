@@ -103,7 +103,6 @@ def build() -> str:
     by_v2 = {r["job_id"]: r for r in v2}
     flagged = lambda r: r["label"] in FLAGGED  # noqa: E731
     missed = [r for r in v1 if r["gold"] == 1 and not flagged(r)]
-    missed_cleared = sum("cleared_by_screen" in r["reason_codes"] for r in missed)
     false_alarms = [r for r in v1 if r["gold"] == 0 and flagged(r)]
     alarms_s5 = sum("§5" in r["sections"] for r in false_alarms)
     v2_catches = sum(flagged(by_v2[r["job_id"]]) for r in missed)
@@ -269,30 +268,27 @@ def build() -> str:
     w("## Why fraud gets through, and how we know")
     w("")
     w(
-        f"Under v1, {len(missed)} fraud postings were labeled ALLOWED: {missed_cleared} cleared by Jev before Claude "
-        f"read them, and {len(missed) - missed_cleared} read by Claude and allowed. They don't break a rule the policy "
-        f"states: {history['complete']} of the {len(missed)} have a logo and a full company profile, and read like "
-        "ordinary ads. Three checks say the policy, not the agent, is the limit:"
+        f"Under v1, {len(missed)} fraud postings were labeled ALLOWED. They look like ordinary ads: no fee, no request "
+        f"for bank details, no unrealistic pay, and {history['complete']} of them have a logo and a full company "
+        "profile. So did the agent miss something, or does the policy not cover them? Three checks say it's the policy:"
     )
     w("")
     w(
-        "1. **Not the screen** (on the 300 development postings): with Claude reading every posting and no Jev, 38 fraud "
-        "postings were still allowed, against 39 with Jev."
+        "1. **It isn't the screen.** With Claude reading every posting and no Jev, it allowed almost the same fraud "
+        "(38 against 39, on the 300 development postings)."
     )
     w(
-        "2. **Changing the policy changes what is caught.** v2 adds §6 (a company's text copied, with no profile or "
-        f"logo of its own). On the 400 it catches {v2_catches} of the {len(missed)} that v1 missed, and sends "
-        f"{v2_new_alarms} more legitimate postings to review. On the development postings, which §6 was written from, "
-        "it caught 19 of 39: the 400 is the fair test, and §6 helps less here because most of these misses do show "
-        "a logo."
+        "2. **Changing the policy catches some.** v2 adds §6, for a company's text copied with no profile or logo of "
+        f"its own. It catches {v2_catches} of the {len(missed)}, at the cost of {v2_new_alarms} more legitimate postings "
+        "sent to review. (It caught more on the development postings, but §6 was written from those, so this test set "
+        "is the fair measure.)"
     )
     w(
-        f"3. **The employer's history would catch most of the rest.** {history['missed_known']} of the {len(missed)} "
-        f"missed postings share their company profile with other postings in the dataset (outside the 400), all of them "
-        f"fraud. No legitimate posting in the 400 does ({history['legit_known']} of 300). Adding that check to v1 "
-        f"would flag {history['caught_with']} of 100 fraud postings with the same {history['false_alarms_with']} false "
-        "alarms. This is an estimate from the dataset's labels; in production the history would be the marketplace's "
-        "confirmed takedowns. It is the next thing to build (not built here)."
+        f"3. **The real signal is the employer.** {history['missed_known']} of the {len(missed)} share their company "
+        f"profile with other postings that are all fraud, and no legitimate posting in the test set does. Checking the "
+        f"employer's history would catch them with no new false alarms: {history['caught_with']} of 100 fraud flagged. "
+        "That's the next thing to build. (An estimate from the dataset's labels; in production, the history would be "
+        "the marketplace's confirmed takedowns.)"
     )
     w("")
 

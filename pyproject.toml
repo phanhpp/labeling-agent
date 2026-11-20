@@ -1,0 +1,40 @@
+[project]
+name = "labeling-agent"
+version = "0.1.0"
+description = "Labels job postings against a versioned fraud policy, with evidence."
+requires-python = ">=3.12,<3.13"
+# Runtime packages only. Later phases add the model, LangGraph and web packages as they need them.
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "psycopg-pool>=3.2",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.uv]
+package = false  # an app, not a library: run with `uv run`, nothing to install
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]  # so tests import app and scripts from the repo root
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+markers = [
+    "e2e: calls real models; needs API keys (skipped without them)",
+    "data: needs the dataset CSV in data/raw/ (run scripts/load_data.py first)",
+]

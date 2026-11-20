@@ -22,3 +22,6 @@ web/playwright-report/
 
 # OS
 .DS_Store
+
+# My own review notes; only the docs the brief asks for (README, DESIGN, RESULTS) are tracked
+docs/

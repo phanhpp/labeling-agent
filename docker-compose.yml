@@ -1,0 +1,20 @@
+# One command: docker compose up. Phase 1 has only the database; later phases add api and worker.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: labeler
+      POSTGRES_PASSWORD: labeler
+      POSTGRES_DB: labeler
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U labeler -d labeler"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db-data:

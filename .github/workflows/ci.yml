@@ -1,0 +1,66 @@
+# The code check, on every pull request and every push to main. No secrets and no model calls.
+#
+#   api   import check with runtime packages only (proves the Docker image will be complete),
+#         then lint, format and the test suite against a throwaway Postgres, on Python 3.12.
+#         Tests marked e2e (real models) or data (needs the 50 MB dataset) are left out.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# The token can only read the repository: no step here pushes, comments or edits anything.
+permissions:
+  contents: read
+
+# A newer push to the same branch makes an older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: labeler
+          POSTGRES_PASSWORD: labeler
+          POSTGRES_DB: labeler
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U labeler -d labeler"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      DATABASE_URL: postgresql://labeler:labeler@localhost:5432/labeler
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      # --no-dev installs exactly what the Docker image will install, so an import that only works
+      # because a dev tool pulled a package in fails here.
+      - name: Import check with runtime packages only
+        run: uv run --no-dev --frozen python -c "import app.config, app.db, app.dataset, app.policy, scripts.load_data"
+
+      - run: uv sync --frozen
+
+      - run: uv run ruff check .
+
+      - run: uv run ruff format --check .
+
+      - name: Tests (no model calls, no dataset download)
+        run: uv run pytest -m "not e2e and not data" -q

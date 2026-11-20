@@ -116,7 +116,7 @@ Quality is checked at three points: before a change ships, on every post, and af
 - **Deterministic code checks** on every trace, so a failure that slips through still shows up.
 - **LLM judges** on a small sample (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
 - **Human annotation:** Jev clears most posts without Claude reading them, and nothing else would catch a fraud it wrongly cleared, so 1% of those go to an analyst anyway. Low judge scores go to the same annotation queue.
-- **Analyst corrections:** when an analyst changes a label in the UI, the case is saved for review and sorted: a policy issue (the policy doesn't cover the case) is fixed with a new policy version, an agent issue (the agent misread the policy) in the prompts or the screen. Either way it joins the hand-written cases, and corrections are tracked per policy section.
+- **Analyst corrections:** when an analyst changes the final label, we review the case to see whether the policy is missing something or the agent misread it, and add it to the hand-written cases.
 - **Drift:** daily per policy version: label rates, how much Jev clears, injection flags.
 
 **Calibration.** Two Jev thresholds are tuned on labeled development data: the labeling cut-off (below it, a post is cleared without Claude) and the injection confidence threshold (at or above it, a post is held unread). Both are re-tuned when the policy changes. The LLM judges are calibrated with human annotations: each judge's pass line is set where it agrees with the analysts' labels.

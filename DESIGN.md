@@ -120,7 +120,7 @@ flowchart LR
 - **Fail closed:** after 3 failed attempts the post is held at NEEDS_REVIEW with a reason code, never ALLOWED.
 - **Crash recovery:** each finished step is saved, so a redelivered job resumes without paying the models twice.
 
-**Tools.** None: the policy fits in the prompt. The first to add is the employer's history: most missed fraud came from employers whose other postings are fraud, and this check would catch most of it ([RESULTS.md](RESULTS.md)).
+**Tools.** None in v1. The policy fits in the prompt, and a model with no tools gives an injection nothing to misuse. Tools come in only where the eval shows a gap, starting with **employer history**, since most missed fraud came from employers whose other postings are fraud (about two-thirds of the misses, [RESULTS.md](RESULTS.md)). Then **related postings** (the same email, phone or link reused across ads, a sign of a scam ring), a **domain check** (does the link match the company, and how new is it) and a **company registry lookup** (does the employer exist). If the policy outgrows the prompt, a **section picker** would send only the sections Jev scores as likely. Every tool is read-only and called by the graph, not chosen by the model; its result enters the prompt as a fact, never a label, and a failed call just means no result.
 
 ## 5. Evaluation and quality over time
 

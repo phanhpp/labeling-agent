@@ -112,7 +112,7 @@ Quality is checked at three points: before a change ships, on every post, and af
 
 **On every post (in the flow).** Deterministic code checks, fast and reliable: every section exists, every quote really appears in the posting, the label matches the findings. A failure sends the post to an analyst with the reason, never to ALLOWED.
 
-**After shipping (online, in LangSmith).** Production has no answer key, so three signals:
+**After shipping (online, in LangSmith).** Production has no answer key, so it relies on these signals:
 - **Deterministic code checks** on every trace, so a failure that slips through still shows up.
 - **LLM judges** on a small sample (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
 - **Human annotation:** Jev clears most posts without Claude reading them, and nothing else would catch a fraud it wrongly cleared, so 1% of those go to an analyst anyway. Low judge scores go to the same annotation queue.

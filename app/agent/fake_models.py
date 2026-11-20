@@ -40,7 +40,7 @@ class FakeLabeler:
             findings.append(
                 RawFinding(
                     section=code,
-                    reasoning="Fake rule.",
+                    reasoning=f'Found "{quote}".' if quote else "None of this section's words appear.",
                     status=status,
                     quotes=[quote] if quote else [],
                     confidence=0.8,
@@ -54,7 +54,9 @@ class FakeLabeler:
             findings.append(
                 RawFinding(
                     section="§6",
-                    reasoning="Fake rule.",
+                    reasoning="A copied company overview, with no profile and no logo."
+                    if overview
+                    else "No copied company overview without a profile and logo.",
                     status="matched" if overview else "not_matched",
                     quotes=[overview] if overview else [],
                     confidence=0.7,
@@ -63,15 +65,18 @@ class FakeLabeler:
         findings.append(
             RawFinding(
                 section="§5",
-                reasoning="Fake rule.",
+                reasoning="The company profile is empty." if empty else "The company profile is filled in.",
                 status="matched" if empty else "not_matched",
                 missing_fields=["company_profile"] if empty else [],
                 confidence=0.6,
             )
         )
+        kept = [f for f in findings if f.section in codes]
+        matched = [f.section for f in kept if f.status == "matched"]
         answer = RawAnswer(
-            findings=[f for f in findings if f.section in codes],
-            rationale="Labeled by the fake model (no real model was called).",
+            findings=kept,
+            rationale=(f"Word rules matched {', '.join(matched)}." if matched else "No word rule matched.")
+            + " (Sample mode: a stand-in for Claude that matches fixed words.)",
         )
         raw = AIMessage(
             content="",

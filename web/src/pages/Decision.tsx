@@ -28,7 +28,7 @@ export default function Decision() {
       <aside className="rail">
         <Verdict label={data} onDecided={reload} />
         <Findings label={data} />
-        <Guardrails label={data} />
+        <Checks label={data} />
         <Timeline postingId={data.posting_id} />
         <History label={data} />
       </aside>
@@ -82,8 +82,9 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
       <div className="verdict">
         <LabelBadge label={label.label} />
         {label.policy_sections.map((s) => <SectionTag key={s} code={s} title={sections[s]} />)}
-        <span className="muted">confidence {label.confidence.toFixed(2)} · {label.policy_version}</span>
+        <span className="muted">under policy {label.policy_version}</span>
       </div>
+      <p className="hint">{confidenceText(label)}</p>
       <p className="rationale">{label.rationale}</p>
       {label.reason_codes.length > 0 && <p className="codes">{label.reason_codes.map((r) => <code key={r}>{r}</code>)}</p>}
       {decision && (
@@ -95,6 +96,14 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
       {user.role !== "viewer" && <DecideForm labelId={label.id} onDecided={onDecided} />}
     </section>
   );
+}
+
+// Where the confidence number comes from, in words.
+function confidenceText(label: Detail): string {
+  const c = label.confidence.toFixed(2);
+  if (label.reason_codes.includes("cleared_by_screen")) return `Confidence ${c}: one minus Jev's highest section score.`;
+  if (label.confidence === 0) return "Confidence 0: no model judged this posting, so a person should.";
+  return `Confidence ${c}: how sure the model said it was (0 to 1), for the section the label rests on. The model's own estimate, not a measured probability.`;
 }
 
 function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => void }) {
@@ -112,6 +121,7 @@ function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => 
         );
       }}
     >
+      <b className="small full">Your decision: final, and what the marketplace sees</b>
       <select aria-label="Your decision" value={choice} onChange={(e) => setChoice(e.target.value)}>
         <option value="VIOLATING">Violating</option>
         <option value="NEEDS_REVIEW">Needs review</option>
@@ -146,25 +156,44 @@ function Findings({ label }: { label: Detail }) {
   );
 }
 
-function Guardrails({ label }: { label: Detail }) {
+// What the system checked on this posting, as plain sentences. A "!" marks something to notice.
+function Checks({ label }: { label: Detail }) {
   const s = label.screen ?? {};
-  const dropped = label.findings.reduce((n, f) => n + f.dropped_quotes.length, 0);
+  const dropped = label.findings.flatMap((f) => f.dropped_quotes);
   const verified = label.findings.reduce((n, f) => n + f.quotes.length, 0);
-  const injection = s.injection_flag
-    ? `suspected${s.regex_hits?.length ? `: "${s.regex_hits[0]}"` : s.injection != null ? `, score ${s.injection.toFixed(2)}` : ""}`
-    : s.injection != null ? `none (score ${s.injection.toFixed(2)})` : "none found";
-  const screen = s.used ? `${s.used}${s.cleared ? ", cleared" : ""}${(s.reason_codes ?? []).length ? ` (${s.reason_codes.join(", ")})` : ""}` : "none";
+  const hidden = label.facts.hidden_chars_removed ?? 0;
+  const empty: string[] = label.facts.empty_fields ?? [];
+  const items: { text: string; warn?: boolean }[] = [];
+
+  if (s.injection_flag) {
+    items.push({
+      warn: true,
+      text: s.regex_hits?.length
+        ? `It tries to give instructions to an AI ("${s.regex_hits[0]}"), so no AI model labeled it.`
+        : `Jev rated it likely to give instructions to an AI (${s.injection.toFixed(2)}), so no AI model labeled it.`,
+    });
+  } else {
+    items.push({ text: "No attempt to give instructions to an AI was found." });
+  }
+  items.push(
+    hidden
+      ? { warn: true, text: `${hidden} characters of hidden text were removed before any model read it.` }
+      : { text: "No hidden text." },
+  );
+  if (s.cleared) items.push({ text: "Jev scored every section low, so Claude wasn't needed." });
+  else if (s.used === "jev" || s.used === "haiku") items.push({ text: `${s.used === "jev" ? "Jev" : "Haiku"} couldn't rule every section out, so Claude read it.` });
+  if ((s.reason_codes ?? []).includes("screen_unavailable")) items.push({ warn: true, text: "The screen was unavailable, so Claude read it directly." });
+  if (verified) items.push({ text: `${verified === 1 ? "The quote" : `All ${verified} quotes`} shown above ${verified === 1 ? "was" : "were"} found word for word in the posting.` });
+  if (dropped.length) items.push({ warn: true, text: `${dropped.length} more ${dropped.length === 1 ? "quote was" : "quotes were"} discarded because ${dropped.length === 1 ? "it isn't" : "they aren't"} in the posting.` });
+  if (empty.length) items.push({ text: `Left empty by the employer: ${empty.map((f) => f.replace("_", " ")).join(", ")}.` });
+  if (label.cost_usd > 0) items.push({ text: `Labeling cost $${label.cost_usd.toFixed(4)} and took ${(label.latency_ms / 1000).toFixed(1)} s.` });
+
   return (
     <section className="card">
-      <h3>Guardrails</h3>
-      <div className="guards">
-        <div><span>Injection</span>{injection}</div>
-        <div><span>Hidden text removed</span>{label.facts.hidden_chars_removed ?? 0} characters</div>
-        <div><span>Quotes</span>{verified} verified, {dropped} dropped</div>
-        <div><span>Screen</span>{screen}</div>
-        <div><span>Empty fields</span>{(label.facts.empty_fields ?? []).join(", ") || "none"}</div>
-        <div><span>Cost and time</span>${label.cost_usd.toFixed(4)} · {(label.latency_ms / 1000).toFixed(1)} s</div>
-      </div>
+      <h3>Checks on this posting</h3>
+      <ul className="checks">
+        {items.map((item, i) => <li key={i} className={item.warn ? "warn" : ""}>{item.text}</li>)}
+      </ul>
     </section>
   );
 }

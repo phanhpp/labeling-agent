@@ -2,13 +2,13 @@
 // app/auth.py). There is no login page: a local demo picks a user, and the API checks the token's
 // role on every request. A cookie sign-in would be the production version.
 
-export type User = { key: string; name: string; role: "viewer" | "editor" | "publisher"; token: string };
+export type User = { key: string; name: string; role: "viewer" | "editor" | "publisher"; token: string; can: string };
 
 export const USERS: User[] = [
-  { key: "viewer", name: "Vic", role: "viewer", token: "demo-viewer" },
-  { key: "editor", name: "Eddie", role: "editor", token: "demo-editor" },
-  { key: "publisher_a", name: "Pat", role: "publisher", token: "demo-publisher-a" },
-  { key: "publisher_b", name: "Sam", role: "publisher", token: "demo-publisher-b" },
+  { key: "viewer", name: "Vic", role: "viewer", token: "demo-viewer", can: "can read" },
+  { key: "editor", name: "Eddie", role: "editor", token: "demo-editor", can: "can decide and edit drafts" },
+  { key: "publisher_a", name: "Pat", role: "publisher", token: "demo-publisher-a", can: "can also publish" },
+  { key: "publisher_b", name: "Sam", role: "publisher", token: "demo-publisher-b", can: "can also publish" },
 ];
 
 const STORE = "acting-as";

@@ -13,8 +13,8 @@ export default function Versions() {
     <div className="page narrow">
       <h2>Policy versions</h2>
       <p className="muted">
-        One version is live. A draft is edited, tested against recent postings in shadow, then published by someone
-        who didn't edit it.
+        One version is live and labels every new posting. To change the policy: open the live version and create a
+        draft, edit and save it, Test it on recent postings, then a publisher who didn't edit it publishes it.
       </p>
       <ErrorNote error={error} />
       {data && (
@@ -48,7 +48,7 @@ export default function Versions() {
         }}
       >
         <input aria-label="New draft name" placeholder="New draft name, e.g. v5" value={name} onChange={(e) => setName(e.target.value)} />
-        <button type="submit" disabled={!name.trim()}>Create draft from the live version</button>
+        <button type="submit" disabled={!name.trim()}>Create a draft from the live version</button>
         {message && <p className="error" role="alert">{message}</p>}
       </form>
     </div>

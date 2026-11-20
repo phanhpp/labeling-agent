@@ -61,7 +61,7 @@ export default function Browse() {
             <div className="table-wrap">
               <table className="labels">
                 <thead>
-                  <tr><th>Label</th><th>Job</th><th>Title</th><th>Sections</th><th className="hide-sm">Conf.</th><th className="hide-sm">Why</th></tr>
+                  <tr><th>Label</th><th>Job</th><th>Title</th><th>Sections</th><th className="hide-sm" title="How sure the model said it was, from 0 to 1 (its own estimate)">Confidence</th><th className="hide-sm">Why</th></tr>
                 </thead>
                 <tbody>
                   {data.items.map((row) => (

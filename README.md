@@ -92,37 +92,17 @@ worker       takes the job and runs these steps:
 
 ## How well it works
 
-The dataset (17,880 postings, about 5% fraud) comes with a fixed test set of 400 postings chosen by the assignment, 100 of them fraud. Those 400 are kept apart: nothing was tuned on them. On them, under the brief's policy, the agent flags 59 of the 100 fraud postings (13 VIOLATING, 46 for review), labels no legitimate posting VIOLATING, sends 23% of postings to review, and costs $2.75 per 1,000 postings at the real fraud rate. The full results, cost, latency and error analysis are in [RESULTS.md](RESULTS.md).
+On the 400 test postings the assignment fixes (100 fraud, never used for tuning), the agent flags 59 of the 100 fraud postings, labels no legitimate posting VIOLATING, sends 23% of postings to review and costs $2.75 per 1,000 at the real fraud rate. Most fraud it misses breaks no rule in the policy; the giveaway is the employer. The numbers, cost, latency and error analysis are in [RESULTS.md](RESULTS.md).
 
-All tuning used 300 other postings: 75 fraud, 225 legitimate. This is where they ended up, with Jev screening and Claude labeling:
-
-| | Labeled VIOLATING | Sent to an analyst | Labeled ALLOWED |
-| --- | --- | --- | --- |
-| 75 fraud postings | 5 | 31 | 39 |
-| 225 legitimate postings | 0 | 35 | 190 |
-
-- **No legitimate posting is labeled VIOLATING.** When the system says VIOLATING, it can show the sentence that breaks the policy.
-- **Analysts check 66 of the 300 postings (22%).** Most are there because the posting has no company profile, so the employer can't be identified (§5). About half of them are fraud.
-- **39 fraud postings are labeled ALLOWED**, because nothing in their text breaks the policy: no fee, no request for bank details, no unrealistic pay. See below.
-- **Cost: about a third of a cent per posting** ($3.26 per 1,000). Jev clears about half the postings in 0.3 s, almost for free. The rest go to Claude, which takes about 5 s and costs about $0.007 each. Sending every posting to Claude would cost $7.36 per 1,000.
-- **Every piece of evidence shown is a real quote.** Claude quoted 130 sentences as evidence; 125 were found word for word in the posting. The other 5 couldn't be found word for word, so they were discarded and never shown.
-
-### Why 39 fraud postings get through, and how we know
-
-The policy doesn't describe what they do. Three checks:
-
-1. **It isn't the screen.** With Claude reading every posting and no Jev, 38 fraud postings are still ALLOWED. Of the 19 that Jev cleared, Claude on its own would have allowed 18.
-2. **It isn't Claude missing something.** Read one by one, most are copies of real companies' ads (oil and gas firms, hospitals) posted with an empty company profile and no logo. Nothing in them matches §1 to §5.
-3. **Describing them in the policy catches them.** Policy v2 adds one section, §6: *a company's text copied, with no profile of its own and no logo*. On the same 300 postings:
+### Run the eval
 
 ```
-                    fraud (75)                     legitimate (225)
-                VIOLATING  review  ALLOWED     VIOLATING  review  ALLOWED
-v1 (the brief)      5        31      39            0        35      190
-v2 (adds §6)        6        49      20            0        41      184
+make eval-dev        # real models on 50 development postings (about $0.20), a quick check
+uv run python -m eval.run_eval --split eval --config jev_sonnet --frozen --policy v1   # the 400 test postings (about $1.35)
+make results         # write RESULTS.md from the saved runs, and check it matches them
 ```
 
-19 of the 39 are now held for review, 18 of them by §6, while only 6 more legitimate postings are. So the agent follows the policy it is given; what it catches is a policy decision. (§6 was written after reading these 300 postings, so this flatters it: the fair test is the 400, in [RESULTS.md](RESULTS.md).)
+Each run saves its per-posting results and a summary in `eval/runs/<name>/`. The 400 test postings are read straight from the dataset file and never enter the database, so the app can't be tuned on them by accident.
 
 ## How the two thresholds were chosen
 
@@ -173,11 +153,13 @@ v4 costs nothing: only what the label does with §4 changed, not what Claude is 
 | Cognito sign-in | Demo users, picked with "Acting as" in the UI |
 | CloudFront | The API serves the UI |
 | Webhooks, gradual rollout | Not built: clients ask for labels, and Test runs in the background |
+| Online judges, alerts, the spend cap, the Jev circuit breaker, re-checking only an edited section | Not built: described in DESIGN.md as the production plan |
 
 ## Tests
 
-- `make test`: 248 Python tests (with a fake model, so no keys needed) and the UI's unit tests.
-- `make up-fake seed e2e`: browser tests on the running app, including the role check (a viewer can't edit, an editor can't publish, the person who edited a draft can't publish it).
+- `make test`: 268 Python tests (with a fake model, so no keys needed) and 25 UI unit tests.
+- `make up-fake seed e2e`: 17 browser tests on the running app, including the role check (a viewer can't edit, an editor can't publish, the person who edited a draft can't publish it) and the live demo.
+- `make guardrails`: shows the API refusing an oversized request, a bad batch item, the wrong role and another client's posting, and holding an injection.
 - Every pull request runs all of these. Changes to the agent or the policy also run real-model checks: hand-written edge cases, injection attempts and policy changes must all pass, and a 50-posting sample must stay above its marks.
 
 ## Where things are

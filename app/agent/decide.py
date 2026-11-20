@@ -5,7 +5,8 @@
   2. Otherwise NEEDS_REVIEW if any section is matched (its effect is NEEDS_REVIEW, like §5) or
      unsure.
   3. Otherwise ALLOWED.
-  4. A suspected prompt injection makes the label at least NEEDS_REVIEW.
+  4. A suspected prompt injection: NEEDS_REVIEW with confidence 0. The graph sends such a posting
+     here straight from the screen, so no labeling model ever reads it.
   5. If an earlier step failed, NEEDS_REVIEW with confidence 0.
 
 Missing fields alone can never make VIOLATING: rule 1 needs a quote. That is the brief's edge case,
@@ -41,6 +42,7 @@ def decide(
 
     Exactly one of these describes how the run went:
       failure         an earlier step failed (a code from FAILURES);
+      injection       the screen suspects a prompt injection, so no model labeled the posting;
       cleared_scores  the screen cleared the posting without a model call (score per section);
       checked         the model answered and check has verified it.
     """
@@ -52,6 +54,18 @@ def decide(
             rationale=f"Held for review: {FAILURES.get(failure, failure)}.",
             confidence=0.0,
             reason_codes=[failure],
+        )
+    elif injection:
+        decision = Decision(
+            label="NEEDS_REVIEW",
+            sections=[],
+            evidence=[],
+            rationale=(
+                "Held for review: the posting appears to give instructions to an AI reviewer, "
+                "so no model labeled it."
+            ),
+            confidence=0.0,
+            reason_codes=["injection"],
         )
     elif checked is None:
         if not cleared_scores:
@@ -70,15 +84,6 @@ def decide(
         )
     else:
         decision = _from_findings(policy, checked)
-
-    if injection:
-        update: dict = {"reason_codes": [*decision.reason_codes, "injection"]}
-        if decision.label == "ALLOWED":
-            update["label"] = "NEEDS_REVIEW"
-            update["rationale"] = (
-                "Held for review: the posting appears to give instructions to an AI. " + decision.rationale
-            )
-        decision = decision.model_copy(update=update)
     return decision
 
 

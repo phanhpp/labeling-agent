@@ -43,9 +43,9 @@ async def test_a_crashed_run_resumes_after_the_screen(fresh_db_url, monkeypatch)
     screens = []
     real_screen = __import__("app.agent.graph", fromlist=["run_screen"]).run_screen
 
-    async def counted(*args):
+    async def counted(*args, **kwargs):
         screens.append(1)
-        return await real_screen(*args)
+        return await real_screen(*args, **kwargs)
 
     monkeypatch.setattr("app.agent.graph.run_screen", counted)
     graph = build(checkpointer=saver)

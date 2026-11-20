@@ -5,4 +5,4 @@ prompt template or the rules in check.py and decide.py change, so no label made 
 reused as if it were current.
 """
 
-AGENT_VERSION = "1"
+AGENT_VERSION = "2"

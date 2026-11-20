@@ -57,9 +57,9 @@ async def test_a_failed_attempt_resumes_without_rerunning_finished_nodes(api, wo
     screens = []
     real = graph_module.run_screen
 
-    async def counted(*args):
+    async def counted(*args, **kwargs):
         screens.append(1)
-        return await real(*args)
+        return await real(*args, **kwargs)
 
     monkeypatch.setattr("app.agent.graph.run_screen", counted)
     _use(monkeypatch, FakeChat(error=ConnectionError("Anthropic is down")))

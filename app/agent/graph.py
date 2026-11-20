@@ -1,8 +1,10 @@
 """The labeling agent: a fixed LangGraph graph.
 
     START -> clean -> cache --hit--> END
-                        \\ miss -> screen --cleared--> decide -> END
+                        \\ miss -> screen --cleared or injection--> decide -> END
                                         \\ escalate -> check -> decide -> END
+
+A suspected injection never reaches the escalation model: decide holds it for review.
 
 An expected failure in clean or escalate goes straight to decide, which holds the posting for review.
 An unexpected exception goes up to the caller (the worker retries the job; the eval lists it as errored).
@@ -55,7 +57,7 @@ async def cache_node(state: State, runtime: Runtime[Context]) -> dict:
 
 async def screen_node(state: State, runtime: Runtime[Context]) -> dict:
     ctx = runtime.context
-    screen, usage = await run_screen(_cleaned(state), ctx.policy, ctx.config)
+    screen, usage = await run_screen(_cleaned(state), ctx.policy, ctx.config, raw=state["raw"])
     return {"screen": screen, "usage": usage}
 
 
@@ -117,7 +119,8 @@ def _after_cache(state: State) -> str:
 
 
 def _after_screen(state: State) -> str:
-    return "decide" if state["screen"].get("cleared") else "escalate"
+    screen = state["screen"]
+    return "decide" if screen.get("cleared") or screen.get("injection_flag") else "escalate"
 
 
 def _after_escalate(state: State) -> str:

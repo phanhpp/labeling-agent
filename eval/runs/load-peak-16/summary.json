@@ -1,0 +1,21 @@
+{
+ "run": "load-peak-16",
+ "started_at": "2026-11-20T23:19:52.843078+00:00",
+ "shape": {
+  "rate_per_s": 11.6,
+  "seconds": 30
+ },
+ "workers": "1x16",
+ "accepted": 348,
+ "postings": 348,
+ "labeled": 348,
+ "submit_to_label_s": {
+  "p50": 11.0,
+  "p95": 20.6,
+  "max": 22.1
+ },
+ "within_60s": 1.0,
+ "throughput_per_s": 6.78,
+ "failed": 0,
+ "cost_usd": 0.946
+}

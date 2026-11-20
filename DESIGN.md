@@ -115,9 +115,10 @@ Quality is checked at three points: before a change ships, on every post, and af
 **After shipping (online, in LangSmith).** Production has no answer key, so three signals:
 - **Deterministic code checks** on every trace, so a failure that slips through still shows up.
 - **LLM judges** on a small sample (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
-- **Human annotation:** Jev clears most posts without Claude reading them, and nothing else would catch a fraud it wrongly cleared, so 1% of those go to an analyst anyway. How often analysts overturn a label is tracked per policy section. Low judge scores and overturned labels land in an annotation queue, and confirmed mistakes join the hand-written cases, so the tests grow from real errors.
+- **Human annotation:** Jev clears most posts without Claude reading them, and nothing else would catch a fraud it wrongly cleared, so 1% of those go to an analyst anyway. Low judge scores go to the same annotation queue.
+- **Analyst corrections:** when an analyst changes a label in the UI, the case is saved for review and sorted: a policy issue (the policy doesn't cover the case) is fixed with a new policy version, an agent issue (the agent misread the policy) in the prompts or the screen. Either way it joins the hand-written cases, and corrections are tracked per policy section.
 - **Drift:** daily per policy version: label rates, how much Jev clears, injection flags.
 
-**Calibration.** Jev's cut-offs are fitted on labeled development data: the clearing cut-off so Jev clears almost nothing Claude would flag, the injection threshold so it holds almost no ordinary post. They are re-checked when a policy changes or the audit finds misses. The LLM judges are checked against people: analysts label a sample of close calls, and a judge whose scores disagree with them has its pass line or question adjusted.
+**Calibration.** Two Jev thresholds are tuned on labeled development data: the labeling cut-off (below it, a post is cleared without Claude) and the injection confidence threshold (at or above it, a post is held unread). Both are re-tuned when the policy changes. The LLM judges are calibrated with human annotations: each judge's pass line is set where it agrees with the analysts' labels.
 
-**Alerts (LangSmith and CloudWatch, to Slack).** Quality: judge scores dropping, overturned labels rising. System: errors, p95 over 45 s, a stalled queue, Jev failing, spend ahead of budget.
+**Alerts (LangSmith and CloudWatch, to Slack).** Quality: judge scores dropping, analyst corrections rising. System: errors, p95 over 45 s, a stalled queue, Jev failing, spend ahead of budget.

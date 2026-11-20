@@ -69,11 +69,11 @@ Precision at 4.8% fraud is what precision would be at the dataset's real rate: o
 
 ## Why fraud gets through, and how we know
 
-Under v1, 41 fraud postings were labeled ALLOWED: 26 cleared by Jev before Claude read them, and 15 read by Claude and allowed. They don't break a rule the policy states: 27 of the 41 have a logo and a full company profile, and read like ordinary ads. Three checks say the policy, not the agent, is the limit:
+Under v1, 41 fraud postings were labeled ALLOWED. They look like ordinary ads: no fee, no request for bank details, no unrealistic pay, and 27 of them have a logo and a full company profile. So did the agent miss something, or does the policy not cover them? Three checks say it's the policy:
 
-1. **Not the screen** (on the 300 development postings): with Claude reading every posting and no Jev, 38 fraud postings were still allowed, against 39 with Jev.
-2. **Changing the policy changes what is caught.** v2 adds §6 (a company's text copied, with no profile or logo of its own). On the 400 it catches 7 of the 41 that v1 missed, and sends 13 more legitimate postings to review. On the development postings, which §6 was written from, it caught 19 of 39: the 400 is the fair test, and §6 helps less here because most of these misses do show a logo.
-3. **The employer's history would catch most of the rest.** 27 of the 41 missed postings share their company profile with other postings in the dataset (outside the 400), all of them fraud. No legitimate posting in the 400 does (0 of 300). Adding that check to v1 would flag 86 of 100 fraud postings with the same 45 false alarms. This is an estimate from the dataset's labels; in production the history would be the marketplace's confirmed takedowns. It is the next thing to build (not built here).
+1. **It isn't the screen.** With Claude reading every posting and no Jev, it allowed almost the same fraud (38 against 39, on the 300 development postings).
+2. **Changing the policy catches some.** v2 adds §6, for a company's text copied with no profile or logo of its own. It catches 7 of the 41, at the cost of 13 more legitimate postings sent to review. (It caught more on the development postings, but §6 was written from those, so this test set is the fair measure.)
+3. **The real signal is the employer.** 27 of the 41 share their company profile with other postings that are all fraud, and no legitimate posting in the test set does. Checking the employer's history would catch them with no new false alarms: 86 of 100 fraud flagged. That's the next thing to build. (An estimate from the dataset's labels; in production, the history would be the marketplace's confirmed takedowns.)
 
 ## The policy change, without code
 

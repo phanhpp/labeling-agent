@@ -185,6 +185,15 @@ test("the side panel folds, shows an older version without changing what is live
   await expect(page.getByRole("button", { name: "Show the filters" })).toHaveClass(/has-dot/);
   await page.keyboard.press("ControlOrMeta+KeyB");
   await expect(page.getByLabel("Search job id")).toBeVisible();
+  // and their right edge drags wider
+  const filters = page.locator(".filters-col");
+  const before = (await filters.boundingBox())!.width;
+  const edge = (await page.getByRole("separator", { name: "Resize the filters" }).boundingBox())!;
+  await page.mouse.move(edge.x + 3, edge.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 83, edge.y + 40, { steps: 4 });
+  await page.mouse.up();
+  expect((await filters.boundingBox())!.width).toBeGreaterThan(before + 60);
   await page.getByRole("button", { name: "NEEDS REVIEW" }).click();
 
   await page.getByLabel("Policy shown").selectOption("v1");

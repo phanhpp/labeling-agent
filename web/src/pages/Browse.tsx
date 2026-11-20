@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api, type LabelRow } from "../api";
 import { PanelToggle, usePanelShortcut } from "../components/PanelToggle";
@@ -6,6 +6,7 @@ import { PolicyMatch } from "../components/PolicyMatch";
 import { ErrorNote, LabelBadge, color, useLoad } from "../components/ui";
 import { store, stored, useShared } from "../context";
 import { DEFAULT_PER, LABELS, PAGE_SIZES, pageWindow, readFilters, sectionCodes, toParams, toggle, type Filters } from "../lib/filters";
+import { dragEdge } from "../lib/drag";
 import { saveListContext } from "../lib/listContext";
 import { field } from "../lib/words";
 
@@ -34,6 +35,14 @@ export default function Browse() {
     setFiltersOpen(!filtersOpen);
   };
   usePanelShortcut("filters", toggleFilters);
+  // Drag the filters' right edge to resize them (180 to 420 px), like the workspace.
+  const [filtersWidth, setFiltersWidthState] = useState(() => Number(stored("filters-width", "240")) || 240);
+  const setFiltersWidth = (px: number) => {
+    const width = Math.round(Math.min(420, Math.max(180, px)));
+    store("filters-width", String(width));
+    setFiltersWidthState(width);
+  };
+  const filtersBox = useRef<HTMLElement>(null);
   const filtering = !!(filters.label || filters.section || filters.job_id);
 
   const filtersPanel = (
@@ -76,14 +85,27 @@ export default function Browse() {
   );
 
   return (
-    <div className={`page browse ${filtersOpen ? "" : "filters-hidden"}`}>
-      <aside className="filters-col">
+    <div className={`page browse ${filtersOpen ? "" : "filters-hidden"}`} style={{ "--filters-w": `${filtersWidth}px` } as React.CSSProperties}>
+      <aside className="filters-col" ref={filtersBox}>
         <div className="filters-head">
           {/* a dot on the hidden toggle says the list is filtered */}
           <PanelToggle panel="filters" side="left" open={filtersOpen} onToggle={toggleFilters} dot={!filtersOpen && filtering} />
           {filtersOpen && <span className="group-head">Filter this list</span>}
         </div>
         {filtersOpen && filtersPanel}
+        {filtersOpen && (
+          <div
+            className="resizer resizer-right"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the filters"
+            title="Drag to resize"
+            onPointerDown={(e) => {
+              const left = filtersBox.current?.getBoundingClientRect().left ?? 0;
+              dragEdge(e, (x) => x - left, setFiltersWidth);
+            }}
+          />
+        )}
       </aside>
 
       <main>

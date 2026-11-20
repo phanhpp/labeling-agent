@@ -91,7 +91,8 @@ header nav a.active { background: var(--soft-2); color: var(--ink); font-weight:
 .note p { margin: 0 0 10px; }
 
 /* Labels list */
-.browse { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; }
+.browse { display: grid; grid-template-columns: var(--filters-w, 240px) minmax(0, 1fr); gap: 28px; }
+.filters-col { position: relative; }
 .filters .label-text { margin: 20px 0 8px; }
 .filters .label-text:first-of-type { margin-top: 16px; }
 .chip { display: flex; width: 100%; height: var(--h-btn-sm); justify-content: space-between; align-items: center; padding: 0 10px;
@@ -137,10 +138,9 @@ td.job { overflow-wrap: anywhere; }
 /* A section the posting matched: plain coloured text with a dot, no box; underlined on hover. */
 .match > button { display: inline-flex; align-items: baseline; gap: 6px; height: auto; min-height: 0; padding: 1px 0; margin: 0 10px 4px 0;
   border: 0; border-radius: 0; background: none; font-weight: 600; font-size: var(--fs-sm); text-align: left; line-height: 1.35; white-space: normal;
-  overflow-wrap: break-word; word-break: normal; hyphens: auto; } /* break between words, not inside one */
+  overflow-wrap: break-word; word-break: normal; } /* break between words, not inside one */
 .match > button::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; transform: translateY(-1px); }
 .match > button:hover .match-name { text-decoration: underline; text-underline-offset: 3px; }
-.match > button.unsure::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
 .match-unsure { color: var(--muted); font-weight: 500; }
 td > .match, td > div > .match { display: flex; } /* in the table, one section per line */
 .popover { position: absolute; z-index: 20; top: 28px; left: 0; width: 380px; background: var(--panel); color: var(--ink);
@@ -297,7 +297,9 @@ button.icon:hover { background: var(--soft); border-color: var(--line); color: v
 .browse.filters-hidden { grid-template-columns: 30px minmax(0, 1fr); gap: 12px; }
 .group-head { font-size: var(--fs-md); font-weight: 650; color: var(--ink); margin: 0 0 6px; }
 .resizer { position: absolute; top: 0; left: -3px; width: 6px; height: 100%; cursor: col-resize; z-index: 5; }
-.resizer:hover { background: color-mix(in srgb, var(--focus) 25%, transparent); }
+.resizer:hover, .resizer.dragging { background: color-mix(in srgb, var(--focus) 25%, transparent); }
+.resizer-right { left: auto; right: -17px; } /* in the middle of the gap between the filters and the list */
+body.resizing { cursor: col-resize; user-select: none; }
 
 .side section { padding: 14px 0; border-top: 1px solid var(--line); }
 .side section:first-of-type { border-top: 0; padding-top: 4px; }

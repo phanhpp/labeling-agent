@@ -85,6 +85,15 @@ async def mark_failed(conn: AsyncConnection, job: dict, error: str, model_versio
     return "dead"
 
 
+async def cancel(conn: AsyncConnection, job: dict, reason: str) -> None:
+    """End a job that should no longer run (its draft changed): failed, with no label."""
+    await conn.execute(
+        "UPDATE jobs SET status = 'failed', locked_at = NULL, last_error = %s, finished_at = now()"
+        " WHERE id = %s AND status = 'running' AND attempts = %s",
+        (reason, job["id"], job["attempts"]),
+    )
+
+
 async def save_dead_letter_label(conn: AsyncConnection, job: dict, model_version: str) -> None:
     """NEEDS_REVIEW with reason dlq. Never replaces a real label for the same version and models."""
     await conn.execute(

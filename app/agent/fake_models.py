@@ -19,6 +19,7 @@ _RULES = {
     "§4": ["no experience needed", "no experience necessary"],
 }
 _POSTING = re.compile(r"<posting>\n(.*)\n</posting>", re.S)
+_SECTION = re.compile(r"^(§\d+) ", re.M)  # each section's first line in the system prompt
 
 
 class FakeLabeler:
@@ -30,6 +31,8 @@ class FakeLabeler:
             messages[-1].content if hasattr(messages[-1], "content") else messages[-1][1]
         )
         text = posting.group(1) if posting else ""
+        system = messages[0].content[0]["text"] if hasattr(messages[0], "content") else ""
+        codes = list(dict.fromkeys(_SECTION.findall(system))) or [*_RULES, "§5"]
         findings = []
         for code, phrases in _RULES.items():
             quote = _quote(text, phrases)
@@ -44,6 +47,19 @@ class FakeLabeler:
                 )
             )
         empty = "company_profile" in text.split("Empty fields:")[-1] if "Empty fields:" in text else False
+        no_logo = "company_logo" in text.split("Empty fields:")[-1] if "Empty fields:" in text else False
+        # §6: a copied company overview, with an empty profile and no logo
+        overview = _quote(text, ["corporate overview"]) if empty and no_logo else None
+        if "§6" in codes:
+            findings.append(
+                RawFinding(
+                    section="§6",
+                    reasoning="Fake rule.",
+                    status="matched" if overview else "not_matched",
+                    quotes=[overview] if overview else [],
+                    confidence=0.7,
+                )
+            )
         findings.append(
             RawFinding(
                 section="§5",
@@ -54,7 +70,8 @@ class FakeLabeler:
             )
         )
         answer = RawAnswer(
-            findings=findings, rationale="Labeled by the fake model (no real model was called)."
+            findings=[f for f in findings if f.section in codes],
+            rationale="Labeled by the fake model (no real model was called).",
         )
         raw = AIMessage(
             content="",

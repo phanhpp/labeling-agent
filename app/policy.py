@@ -152,3 +152,36 @@ def render_sections(body: dict) -> str:
 
 def render_edge_cases(body: dict) -> str:
     return "\n".join(f"- {case}" for case in body["header"]["edge_cases"])
+
+
+def diff(old: dict, new: dict) -> list[dict]:
+    """What changed from one version to another: one entry per changed header field or section field.
+    Each entry says whether the models see the change (if not, a re-label can re-decide at $0)."""
+    changes = []
+    for key in ("decision_rule", "labels", "edge_cases"):
+        if old["header"].get(key) != new["header"].get(key):
+            changes.append(
+                {"where": f"header.{key}", "change": "changed", "models_see_it": key == "edge_cases"}
+            )
+    old_sections = {s["code"]: s for s in old["sections"]}
+    new_sections = {s["code"]: s for s in new["sections"]}
+    for code in new_sections.keys() - old_sections.keys():
+        changes.append({"where": code, "change": "added", "models_see_it": True})
+    for code in old_sections.keys() - new_sections.keys():
+        changes.append({"where": code, "change": "removed", "models_see_it": True})
+    for code in old_sections.keys() & new_sections.keys():
+        for key in ("title", "text", "effect", "screen", "red_flags", "examples"):
+            before, after = old_sections[code].get(key), new_sections[code].get(key)
+            if before != after:
+                changes.append(
+                    {
+                        "where": f"{code}.{key}",
+                        "change": "changed",
+                        "models_see_it": key != "effect",
+                        "before": before,
+                        "after": after,
+                    }
+                )
+    if old.get("screen_cut_off") != new.get("screen_cut_off"):
+        changes.append({"where": "screen_cut_off", "change": "changed", "models_see_it": True})
+    return sorted(changes, key=lambda c: c["where"])

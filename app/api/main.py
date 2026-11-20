@@ -21,14 +21,14 @@ from app import queue as jobs
 from app.agent import checkpoints
 from app.agent.configs import missing_keys, worker_config
 from app.agent.graph import build
-from app.api import analyst, intake
+from app.api import analyst, intake, policies
 
 log = logging.getLogger("app.api")
 
 MAX_BODY_BYTES = 10 * 1024 * 1024  # a full batch of 500 dataset postings is about 2.5 MB
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 API_PREFIXES = ("v1", "ui", "policies", "health", "docs", "openapi.json")
-ROUTERS = [intake.router, analyst.router]  # the route-walk test checks every route in these
+ROUTERS = [intake.router, analyst.router, policies.router]  # the route-walk test checks every route in these
 
 
 def create_app(database_url: str | None = None) -> FastAPI:

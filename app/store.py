@@ -181,6 +181,44 @@ async def save_label(
     return row["id"]
 
 
+async def save_derived_label(
+    conn: AsyncConnection, source: dict, version: str, policy_hash: str, decision: dict, findings: list
+) -> None:
+    """A label decided again in code from a stored one (re-decide): same model answer, same models,
+    a new policy version. No model call, so it costs $0."""
+    await conn.execute(
+        """
+        INSERT INTO labels (posting_id, policy_version, policy_hash, model_version, label, sections,
+            evidence, findings, raw_output, facts, screen, rationale, confidence, reason_codes,
+            cleaned, derived_from, cost_usd, latency_ms)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 0)
+        ON CONFLICT (posting_id, policy_version, model_version) DO UPDATE SET
+            policy_hash = EXCLUDED.policy_hash, label = EXCLUDED.label, sections = EXCLUDED.sections,
+            evidence = EXCLUDED.evidence, findings = EXCLUDED.findings, rationale = EXCLUDED.rationale,
+            confidence = EXCLUDED.confidence, reason_codes = EXCLUDED.reason_codes,
+            derived_from = EXCLUDED.derived_from, created_at = now()
+        """,
+        (
+            source["posting_id"],
+            version,
+            policy_hash,
+            source["model_version"],
+            decision["label"],
+            decision["sections"],
+            Jsonb(decision["evidence"]),
+            Jsonb(findings),
+            Jsonb(source["raw_output"]),
+            Jsonb(source["facts"]),
+            Jsonb(source["screen"]),
+            decision["rationale"],
+            decision["confidence"],
+            decision["reason_codes"],
+            Jsonb(source["cleaned"]),
+            source["id"],
+        ),
+    )
+
+
 async def cache_lookup(conn: AsyncConnection, key: str) -> dict | None:
     """The newest label made from exactly the same model input, policy and models, to reuse."""
     row = await (
@@ -233,6 +271,14 @@ async def read_label(conn: AsyncConnection, client_id: str, job_id: str) -> dict
         if out["stale"]:
             out["relabel_status"] = await relabel_status(conn, posting["id"], live["name"])
     if decision is not None:
+        # The analyst's decision stays final, but if the live version's model now disagrees with a
+        # decision made under an older version, say so: it goes back to an analyst to look at.
+        out["new_policy_disagrees"] = bool(
+            label is not None
+            and not out.get("stale")
+            and decision["policy_version"] != live["name"]
+            and label["label"] != decision["label"]
+        )
         out |= {
             "label": decision["label"],
             "decided_by": "analyst",

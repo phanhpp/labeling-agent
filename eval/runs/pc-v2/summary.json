@@ -1,0 +1,11 @@
+{
+ "run": "pc-v2",
+ "config": "jev_sonnet",
+ "model_version": "jev_sonnet;escalate=claude-sonnet-5-5;screen=jev;agent=2;prompt=p1",
+ "source": "suite-policy_change-v2",
+ "policy_version": "v2",
+ "finished_at": "2026-11-20T05:40:44.002577+00:00",
+ "passed": 5,
+ "total": 5,
+ "failed": []
+}

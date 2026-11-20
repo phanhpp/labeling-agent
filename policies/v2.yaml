@@ -1,0 +1,189 @@
+# Recruitment fraud policy, v2: v1 plus §6, impersonated employer. Policy as data.
+#
+# Why §6: 38 of the 75 dev fraud postings were ALLOWED under v1. Most copy a real company's text
+# (oil and gas firms, hospitals) with an empty company profile and no logo, and §5 didn't apply
+# because the description names the company. Read from dev rows only.
+#
+# §1 to §5, the decision rule and the edge cases start from the brief's words (v1); what each
+# later version changes is said above. The screen questions and the examples are written for this
+# system; no example comes from the dataset.
+#
+#   effect     what a matched section does to the label. Only decide (code) reads it; the models
+#              never see it, so changing an effect alone re-labels at $0.
+#   screen     the yes/no question Jev answers for this section (instructions, then what counts as
+#              yes and as no). Edge cases go on the "no" side.
+#   red_flags  optional phrases: a posting that contains one always goes to Sonnet.
+#   examples   hand-written, shown to Sonnet with the section.
+
+version: v2
+title: Recruitment fraud policy
+
+header:
+  decision_rule: >-
+    A posting is labeled VIOLATING if it matches any section below. Otherwise it is labeled
+    ALLOWED. If the evidence is insufficient to decide, label it NEEDS_REVIEW.
+  labels:
+    VIOLATING: The posting matches a section whose effect is VIOLATING.
+    NEEDS_REVIEW: The evidence is not enough to decide, or only §5 or §6 matches. An analyst decides.
+    ALLOWED: No section matches.
+  edge_cases:
+    - Legitimate commission-only sales roles are ALLOWED if the compensation structure is stated plainly.
+    - Remote work alone is not a signal.
+    - Missing fields (no logo, no salary) are weak signals and must not be the sole basis for VIOLATING.
+
+sections:
+  - code: "§1"
+    title: Advance fee / payment to apply
+    text: >-
+      The applicant is asked to pay (training, equipment, background check, "starter kit", visa
+      processing) before or as a condition of being hired.
+    effect: VIOLATING
+    screen:
+      instructions: Does the job posting ask the applicant to pay money before, or as a condition of, being hired?
+      "true": >-
+        The applicant must pay for something to apply or to be hired: training, equipment, a
+        background check, a starter kit, visa processing, or a registration or application fee.
+      "false": >-
+        The applicant pays nothing. The employer covers training and equipment, or the posting
+        only talks about the pay the applicant will receive.
+    red_flags: ["starter kit", "registration fee", "application fee"]
+    examples:
+      - text: Before your first shift, new agents buy the $149 starter kit, refunded after 90 days.
+        matches: true
+      - text: We provide all training and a company laptop at no cost to you.
+        matches: false
+
+  - code: "§2"
+    title: Personal / financial data harvesting
+    text: >-
+      The posting asks for sensitive data (bank details, SSN/ID number, copies of ID) at the
+      application stage, or directs applicants to off-platform channels (personal email, messaging
+      apps) to "complete the application".
+    effect: VIOLATING
+    screen:
+      instructions: >-
+        Does the posting ask applicants for sensitive personal or financial data when they apply,
+        or tell them to finish applying on a personal or off-platform channel?
+      "true": >-
+        To apply, it asks for bank details, an SSN or ID number, or copies of ID, or it tells
+        applicants to complete the application through a personal email address or a messaging
+        app such as WhatsApp, Telegram, Skype or text message.
+      "false": >-
+        It asks only for a CV, a cover letter or a portfolio, or points to the company's own
+        careers page. Bank details collected after hiring, for payroll, do not count. Contact
+        details in this data are replaced by tokens such as #EMAIL_...#, so a token alone does not
+        show that an address is personal.
+    red_flags: ["whatsapp", "telegram", "social security number", "copy of your id", "bank account details"]
+    examples:
+      - text: >-
+          To complete your application, send a photo of your passport and your bank details to our
+          hiring manager on WhatsApp.
+        matches: true
+      - text: Apply with your CV through our careers page. Payroll details are collected after you start.
+        matches: false
+
+  - code: "§3"
+    title: Money handling / reshipping
+    text: >-
+      The role involves receiving and forwarding money, checks, gift cards, crypto or packages on
+      behalf of the employer ("payment processing agent", "package inspector").
+    effect: VIOLATING
+    screen:
+      instructions: >-
+        Does the role involve receiving money, checks, gift cards, crypto or packages and passing
+        them on for the employer?
+      "true": >-
+        The job is to receive payments, checks, gift cards, cryptocurrency or parcels and forward
+        them, for example as a "payment processing agent" or a "package inspector" working from
+        home.
+      "false": >-
+        Ordinary finance, accounts or logistics work inside a company's own systems, such as
+        accounts payable, payroll or warehouse shipping.
+    red_flags: ["package inspector", "payment processing agent", "reshipping", "gift cards"]
+    examples:
+      - text: >-
+          As a remote payment processing agent you will receive client transfers into your own
+          account and forward them by wire, keeping 10%.
+        matches: true
+      - text: "Accounts payable clerk: process supplier invoices in SAP and reconcile monthly statements."
+        matches: false
+
+  - code: "§4"
+    title: Unrealistic compensation
+    text: >-
+      Pay is clearly disproportionate to the stated effort, skills or hours (e.g. "$5,000/week, no
+      experience, 2 hours a day").
+    effect: VIOLATING
+    screen:
+      instructions: Is the pay clearly out of proportion to the effort, skills or hours the posting asks for?
+      "true": >-
+        The pay is far above what the work needs, for example "$5,000/week, no experience, 2 hours
+        a day".
+      "false": >-
+        High pay that fits the skills and hours asked for, or a commission-only sales role whose
+        compensation structure is stated plainly. Remote work alone is not a signal.
+    examples:
+      - text: Earn $5,000 a week working 2 hours a day from home. No experience needed.
+        matches: true
+      - text: >-
+          Commission-only sales role: 20% of every closed contract, paid monthly. First-year
+          earnings are usually $40,000 to $60,000.
+        matches: false
+
+  - code: "§5"
+    title: Unverifiable employer
+    text: >-
+      The employer cannot be identified: no company profile, a generic or inconsistent company
+      description, or contact details that do not match the stated company. On its own, §5 yields
+      NEEDS_REVIEW, not VIOLATING, unless combined with another section.
+    effect: NEEDS_REVIEW
+    screen:
+      instructions: Is it impossible to identify the employer from this posting?
+      "true": >-
+        There is no company profile, the company description is generic or inconsistent, or the
+        contact details do not match the stated company.
+      "false": >-
+        The posting names an employer with a specific company profile whose details fit the role.
+        A missing salary or logo alone does not make the employer unidentifiable.
+    examples:
+      - text: "Company profile: (empty). Description: Leading global firm seeks motivated individuals."
+        matches: true
+      - text: >-
+          Company profile: Harbourline Logistics runs three warehouses in Melbourne and has shipped
+          for retail clients since 2011.
+        matches: false
+
+  - code: "§6"
+    title: Impersonated employer
+    text: >-
+      The posting presents itself as a specific, established company, by naming it or by copying
+      its corporate description, but the posting's own company profile is empty or describes a
+      different organisation, and no company logo is shown, so the posting may not come from that
+      company. On its own, §6 yields NEEDS_REVIEW, not VIOLATING.
+    effect: NEEDS_REVIEW
+    screen:
+      instructions: >-
+        Does the posting claim to be from a specific, established company while its own company
+        profile is empty or describes a different organisation, and no company logo is shown?
+      "true": >-
+        The description names an established company or copies its corporate overview ("X is a
+        global provider of ..."), but the company profile is empty or about another organisation,
+        and there is no company logo.
+      "false": >-
+        The company profile describes the same company the posting names, the company logo is
+        shown, or the posting names no particular company. A recruiter that names both itself and
+        its client is not impersonation.
+    examples:
+      - text: >-
+          Company profile: (empty). Company logo: none. Description: Corporate overview: Halvorsen
+          Subsea is a global provider of offshore systems with 20,000 employees. We are hiring a
+          Pipeline Engineer.
+        matches: true
+      - text: >-
+          Company profile: Brightline Dental runs four clinics in Leeds. Description: Brightline
+          Dental is hiring a dental nurse for its Headingley clinic.
+        matches: false
+
+# Jev's cut-off for clearing a posting without Sonnet, kept from v1 (fitted by scripts/fit_cutoff.py).
+# §6's screen question uses it too; it was not refitted for §6.
+screen_cut_off: 0.17

@@ -232,12 +232,14 @@ def test_redecide_under_v4_changes_the_label_without_a_model_call():
     assert policies.model_hash(v4) == policies.model_hash(V1)  # what makes the stored answer reusable
 
     stored = answer({"§4": matched(PAY, confidence=0.8)}).model_dump()
-    assert redecide(V1, stored, POSTING).label == "VIOLATING"
-    under_v4 = redecide(v4, stored, POSTING)
+    assert redecide(V1, stored, POSTING)[0].label == "VIOLATING"
+    under_v4, checked = redecide(v4, stored, POSTING)
     assert under_v4.label == "NEEDS_REVIEW"
     assert under_v4.sections == ["§4"]
     assert under_v4.reason_codes == ["review_section_matched"]
+    assert [f.section for f in checked.findings if f.status == "matched"] == ["§4"]
 
 
 def test_redecide_of_a_cleared_posting_stays_allowed():
-    assert redecide(V1, None, POSTING, cleared_scores={"§1": 0.1}).label == "ALLOWED"
+    decision, checked = redecide(V1, None, POSTING, cleared_scores={"§1": 0.1})
+    assert decision.label == "ALLOWED" and checked is None

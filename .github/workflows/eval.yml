@@ -73,6 +73,9 @@ jobs:
           for suite in edge_cases adversarial; do
             uv run python -m eval.run_eval --suite "$suite" --config jev_sonnet --gate --name "ci-$suite" | tee -a out.txt || failed=1
           done
+          for version in v1 v2 v3 v4; do
+            uv run python -m eval.run_eval --suite policy_change --policy "$version" --config jev_sonnet --gate --name "ci-policy_change-$version" | tee -a out.txt || failed=1
+          done
           uv run python -m eval.run_eval --split dev --limit 50 --config jev_sonnet --gate --name ci-dev50 | tee -a out.txt || failed=1
           { echo "## Eval gate"; echo '```'; grep -E "GATE|passed|recall|precision" out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit "$failed"

@@ -243,7 +243,7 @@ test("the live demo sends real postings, follows the run, and compares with the 
   await panel.getByRole("button", { name: "Send 10 postings" }).click();
   const result = page.getByTestId("run-result");
   await expect(result).toContainText("all 10 labeled", { timeout: 30_000 });
-  await expect(result).toContainText(/Caught \d+ of [1-9]\d* fraud/); // 25% fraud: at least one sent
+  await expect(result).toContainText(/of [1-9]\d* fraud, flagged \d+; of \d+ legitimate, wrongly flagged \d+/); // 25%: some fraud
 
   await result.getByRole("button", { name: "Show this run in the list" }).click();
   await expect(page).toHaveURL(/batch=\d+/);
@@ -251,7 +251,7 @@ test("the live demo sends real postings, follows the run, and compares with the 
   await expect(page.locator("tbody tr")).toHaveCount(10);
 
   await page.locator(".listbar").getByText("Compare with the dataset's label").click(); // the list's own switch
-  await expect(page.getByTestId("dataset-summary")).toContainText("10 postings with a dataset label");
+  await expect(page.getByTestId("dataset-summary")).toContainText("Against the dataset's answer (10 postings)");
   await expect(panel.getByRole("checkbox", { name: "Compare with the dataset's label" })).toBeChecked(); // one setting
   await expect(page.locator("td.dataset-cell").first()).toContainText(/fraud|legitimate/);
   await page.locator("tbody tr").first().locator("td.why").click();

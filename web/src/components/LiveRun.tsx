@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { api, explain, type BatchSummary, type Health, type LiveRun as Run } from "../api";
 import { useShared } from "../context";
-import { dollars, plural } from "../lib/words";
+import { dollars } from "../lib/words";
 
 const SIZES = [10, 20, 30, 50, 100];
 const USD_PER_POSTING = 0.0035; // app/demo.py: $3.26 per 1,000 on dev 300 with Jev + Sonnet
@@ -98,7 +98,10 @@ function RunResult({ run, sent, onShow }: { run: BatchSummary; sent: Run | null;
         <li>{run.labels.VIOLATING} violating · {run.labels.NEEDS_REVIEW} review · {run.labels.ALLOWED} allowed</li>
         <li>{run.without_claude} decided without Claude (cleared by Jev, or held as an injection)</li>
         {run.dataset && (
-          <li>Caught {run.dataset.caught} of {run.dataset.fraud} fraud · {plural(run.dataset.false_alarms, "false alarm")}</li>
+          <li>
+            Dataset: of {run.dataset.fraud} fraud, flagged {run.dataset.caught}; of {run.labeled - run.dataset.fraud}{" "}
+            legitimate, wrongly flagged {run.dataset.false_alarms}
+          </li>
         )}
         <li>{dollars(run.cost_usd)} · typical {seconds(run.latency_ms.p50)}, slowest {seconds(run.latency_ms.p95)}</li>
       </ul>

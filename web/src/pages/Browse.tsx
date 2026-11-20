@@ -135,10 +135,17 @@ export default function Browse() {
             {compareDataset && data.dataset && (
               <div className="scope dataset" data-testid="dataset-summary">
                 <span>
-                  <b>Against the dataset:</b>{" "}
-                  {data.dataset.with_dataset === 0
-                    ? "none of these postings came from the live demo, so there is no dataset label to compare."
-                    : `caught ${data.dataset.caught} of ${data.dataset.fraud} fraud, ${plural(data.dataset.false_alarms, "false alarm")} (${plural(data.dataset.with_dataset, "posting")} with a dataset label).`}
+                  {data.dataset.with_dataset === 0 ? (
+                    "None of these postings came from the dataset, so there is no dataset answer to compare."
+                  ) : (
+                    <>
+                      <b>Against the dataset's answer</b> ({plural(data.dataset.with_dataset, "posting")}): of the{" "}
+                      <b>{data.dataset.fraud} fraud</b>, we flagged {data.dataset.caught} and missed{" "}
+                      {data.dataset.fraud - data.dataset.caught}. Of the{" "}
+                      <b>{data.dataset.with_dataset - data.dataset.fraud} legitimate</b>, we wrongly flagged{" "}
+                      {data.dataset.false_alarms}. <span className="muted">Flagged means VIOLATING or sent to review.</span>
+                    </>
+                  )}
                 </span>
                 <span className="spacer" />
                 <label className="switch">

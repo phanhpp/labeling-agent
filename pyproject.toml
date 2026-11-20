@@ -39,6 +39,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# It writes RESULTS.md: long lines are sentences, kept whole so they read as written.
+"eval/report.py" = ["E501"]
+
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI declares dependencies and query parameters as argument defaults.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "app.auth.require"]

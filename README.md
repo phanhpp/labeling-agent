@@ -92,7 +92,7 @@ worker       takes the job and runs these steps:
 
 ## How well it works
 
-The dataset (17,880 postings, about 5% fraud) comes with a fixed test set of 400 postings chosen by the assignment, 100 of them fraud. Those 400 are kept apart: nothing was tuned on them. The final results on them are in [RESULTS.md](RESULTS.md).
+The dataset (17,880 postings, about 5% fraud) comes with a fixed test set of 400 postings chosen by the assignment, 100 of them fraud. Those 400 are kept apart: nothing was tuned on them. On them, under the brief's policy, the agent flags 59 of the 100 fraud postings (13 VIOLATING, 46 for review), labels no legitimate posting VIOLATING, sends 23% of postings to review, and costs $2.75 per 1,000 postings at the real fraud rate. The full results, cost, latency and error analysis are in [RESULTS.md](RESULTS.md).
 
 All tuning used 300 other postings: 75 fraud, 225 legitimate. This is where they ended up, with Jev screening and Claude labeling:
 

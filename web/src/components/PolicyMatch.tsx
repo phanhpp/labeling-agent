@@ -46,8 +46,7 @@ function MatchChip({ m, title, labelId }: { m: Match; title: string; labelId: nu
         aria-label={`${m.section} ${title}${m.status === "unsure" ? ", unsure" : ""}: show the evidence`}
         onClick={() => setOpen((o) => !o)}
       >
-        {m.section} {short}
-        {m.status === "unsure" && " · unsure"}
+        <span><span className="match-name">{m.section} {short}</span>{m.status === "unsure" && <span className="match-unsure"> · unsure</span>}</span>
       </button>
       {open && (
         <div className="popover" role="dialog" aria-label={`${m.section} evidence`} style={{ color: color(m.section) }}>

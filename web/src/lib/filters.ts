@@ -50,3 +50,11 @@ export function toggle(filters: Filters, key: "label" | "section", value: string
   else (next as Record<string, string>)[key] = value;
   return next;
 }
+
+// The policy's sections in order (§1, §2, ... §10), each with its count; a count for a section the
+// policy doesn't have (an older version's) is kept too.
+export function sectionCodes(titles: Record<string, string>, counts: Record<string, number>): [string, number][] {
+  const codes = [...new Set([...Object.keys(titles), ...Object.keys(counts)])];
+  const num = (code: string) => Number(code.replace(/\D/g, "")) || 0;
+  return codes.sort((a, b) => num(a) - num(b)).map((code) => [code, counts[code] ?? 0]);
+}

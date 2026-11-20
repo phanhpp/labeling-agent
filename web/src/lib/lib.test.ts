@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pageWindow, readFilters, toParams, toggle } from "./filters";
+import { pageWindow, readFilters, sectionCodes, toggle, toParams } from "./filters";
 import { segments, spansFor } from "./highlight";
 import { durations, summary } from "./steps";
 
@@ -121,5 +121,15 @@ describe("version tags", async () => {
   it("after a rollback, live and latest are different versions", () => {
     const tagged = tagVersions([v("v1", "live", "2026-11-20T01:00:00Z"), v("v2", "retired", "2026-11-20T02:00:00Z")]);
     expect(tagged.map((t) => t.tags)).toEqual([["previous", "live"], ["latest"]]);
+  });
+});
+
+describe("section filter", () => {
+  it("lists every section of the policy, in order, with 0 for those no posting matches", () => {
+    const titles = { "§10": "Ten", "§2": "Two", "§1": "One" };
+    expect(sectionCodes(titles, { "§2": 4 })).toEqual([["§1", 0], ["§2", 4], ["§10", 0]]);
+  });
+  it("keeps a count for a section the policy no longer has", () => {
+    expect(sectionCodes({ "§1": "One" }, { "§6": 2 })).toEqual([["§1", 0], ["§6", 2]]);
   });
 });

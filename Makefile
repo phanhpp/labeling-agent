@@ -1,12 +1,17 @@
 # Short names for the commands in the README. Each line is the plain command; nothing is hidden.
 
-.PHONY: up up-fake seed down reset api worker web test e2e lint eval-dev demo-versions
+.PHONY: up up-fake demo seed down reset api worker web test e2e lint eval-dev demo-versions
 
 up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 	docker compose up -d --build --wait
 
 up-fake:       ## the same, with a fake model: no keys, no cost
 	LLM_BACKEND=fake docker compose up -d --build --wait
+
+demo:          ## a fresh stack with 100 real development postings labeled by Claude (needs keys, about $0.35)
+	docker compose down -v
+	docker compose up -d --build --wait
+	uv run python -m scripts.submit_postings --split dev --limit 100
 
 seed:          ## load 14 sample postings, a decision and a draft policy (any running stack)
 	uv run python -m scripts.seed_fixtures

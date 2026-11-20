@@ -51,10 +51,10 @@ test("posting text that looks like HTML is shown as text and never runs", async 
   expect(await page.evaluate(() => (window as any).pwned)).toBeUndefined();
 });
 
-test("an injection is held for review and the guardrails say why", async ({ page }) => {
+test("an injection is held for review and the checks say why", async ({ page }) => {
   await openJob(page, "fx-injection");
   await expect(page.locator(".verdict .badge")).toHaveText("NEEDS REVIEW");
-  await expect(page.locator(".guards")).toContainText("suspected");
+  await expect(page.locator(".checks")).toContainText("tries to give instructions to an AI");
   await expect(page.locator(".codes")).toContainText("injection");
 });
 
@@ -67,7 +67,7 @@ test("when the API is down the page says so", async ({ page }) => {
 test("roles: a viewer can't edit, an editor can't publish, an editing publisher can't publish, another can", async ({ page }) => {
   await page.goto("/versions/v2");
   await actAs(page, "viewer");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Save" }).first().click();
   await expect(page.getByText("This user's role can't do that.")).toBeVisible();
 
   await actAs(page, "editor");
@@ -75,7 +75,7 @@ test("roles: a viewer can't edit, an editor can't publish, an editing publisher 
   await expect(page.getByText("This user's role can't do that.")).toBeVisible();
 
   await actAs(page, "publisher_a");
-  await page.getByRole("button", { name: "Save" }).click(); // Pat edits the draft
+  await page.getByRole("button", { name: "Save" }).first().click(); // Pat edits the draft
   await expect(page.getByText(/^Saved\./)).toBeVisible();
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText("You edited this draft, so a different publisher has to publish it.")).toBeVisible();

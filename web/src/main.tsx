@@ -31,11 +31,16 @@ function Header() {
             onChange={(e) => setUser(USERS.find((u) => u.key === e.target.value)!)}
           >
             {USERS.map((u) => (
-              <option key={u.key} value={u.key}>{u.name}, {u.role}</option>
+              <option key={u.key} value={u.key}>{u.name}, {u.role} ({u.can})</option>
             ))}
           </select>
         </label>
       </header>
+      {health.data?.llm_backend === "fake" && (
+        <div className="banner sample" role="status">
+          Sample mode: labels come from a stand-in that matches fixed words, not from Claude. Run <code>make demo</code> for real labels.
+        </div>
+      )}
       {health.data && !health.data.live_labeling && (
         <div className="banner" role="status">
           Live labeling is off: {health.data.missing_keys.join(", ")} not set. Postings are accepted and wait in the queue.

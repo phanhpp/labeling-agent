@@ -103,33 +103,19 @@ flowchart LR
 
 ## 5. Evaluation and quality over time
 
-|  | Offline | In the flow | Online |
-| --- | --- | --- | --- |
-| **What** | Test sets with known answers | Code checks on every post | Real traffic in LangSmith |
-| **When** | Before a change ships | While each post is labeled | After shipping, continuously |
-| **If it fails** | The change is blocked | Post goes to review | Alert, and the case is queued for an analyst |
+Quality is checked at three points: before a change ships, on every post, and after it is live.
 
-**Offline: before a change ships**
+**Before a change ships (offline)**
+- **Three kinds of test data:** a held-out set (400 postings, 100 fraud) used only to report numbers, never to tune; a development set (300 postings) for tuning and comparing set-ups; hand-written cases (edge cases, prompt injections, policy changes) where the right label is known exactly.
+- **Metrics:** precision, recall and F1 on the fraud class, not accuracy, since only 5% of posts are fraud. NEEDS\_REVIEW is counted two ways, as caught (an analyst will see it) and as missed (strict), and the review load is reported, so recall can't be bought by sending everything to review.
+- **Release check in CI:** every change to the agent, a prompt or the policy reruns the hand-written cases, and a change that scores below its pass mark can't merge. Pass marks come from 3 baseline runs, since models vary a little, with no slack on verbatim quotes or injections. A provider outage means a rerun, not a failure.
 
-| Test set | Right answer | Used for |
-| --- | --- | --- |
-| Held-out set: 400 postings, 100 fraud | The dataset's fraud label | Reported numbers only, never tuning |
-| Development set: 300 postings | The dataset's fraud label | Tuning and comparing set-ups |
-| Hand-written cases: edge cases, injections, policy changes | Expected label and sections | Blocking bad changes |
+**On every post (in the flow).** Deterministic code checks, fast and reliable: every section exists, every quote really appears in the posting, the label matches the findings. A failure sends the post to an analyst with the reason, never to ALLOWED.
 
-- **Metrics:** precision, recall and F1 with 95% ranges (NEEDS\_REVIEW counted as caught, and not), a confusion matrix, cost, latency, error types.
-- **Release check in CI:** every change to the agent, prompts or policy reruns the hand-written cases. If any scores below its pass mark, the change can't merge. Pass marks come from 3 baseline runs, with no tolerance on verbatim quotes or injections. An outage isn't counted as a failure; the run is repeated.
+**After shipping (online, in LangSmith).** Production has no answer key, so three signals:
+- **Deterministic code checks** on every trace, so a failure that slips through still shows up.
+- **LLM judges** on a small sample (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
+- **Human annotation:** Jev clears most posts without Claude reading them, and nothing else would catch a fraud it wrongly cleared, so 1% of those go to an analyst anyway. How often analysts overturn a label is tracked per policy section. Low judge scores and overturned labels land in an annotation queue, and confirmed mistakes join the hand-written cases, so the tests grow from real errors.
+- **Drift:** daily per policy version: label rates, how much Jev clears, injection flags.
 
-**In the flow, every post:** code checks that each section exists, each quote is in the posting, and the label matches the findings. A failure sends the post to review with the reason.
-
-**Online: after shipping, in LangSmith**
-
-- **Code checks on every trace:** the same checks, so a failure that slips through shows up.
-- **LLM judges on a small sample** (about 0.25% of posts, capped at $100 a month): are the quotes relevant to the section, and does the rationale follow from them?
-- **Human checks:** 1% of the posts Jev cleared without Claude go to an analyst anyway, because nothing else would catch a fraud Jev wrongly cleared; how often analysts overturn a label is tracked per section; confirmed mistakes join the hand-written cases.
-- **Drift:** daily, per policy version: label rates, how much Jev clears, injection flags.
-
-**Alerts (LangSmith and CloudWatch, to Slack)**
-
-- **Quality:** judge scores falling, more failed checks, more overrides.
-- **System:** errors, p95 over 45 s, a stalled queue, Jev failing, spend ahead of budget.
+**Alerts (LangSmith and CloudWatch, to Slack).** Quality: judge scores dropping, overturned labels rising. System: errors, p95 over 45 s, a stalled queue, Jev failing, spend ahead of budget.

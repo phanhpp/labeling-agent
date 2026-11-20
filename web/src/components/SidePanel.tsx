@@ -4,6 +4,7 @@ import { useShared, type Tagged } from "../context";
 import { USERS } from "../roles";
 import { dragEdge } from "../lib/drag";
 import { api } from "../api";
+import { Fold } from "./Fold";
 import { LiveRunSection } from "./LiveRun";
 import { PanelToggle } from "./PanelToggle";
 import { useLoad } from "./ui";
@@ -66,8 +67,7 @@ export function SidePanel() {
         <p>Choosing a version changes what the pages show, never what is live: only publishing does.</p>
       </section>
 
-      <section>
-        <span className="label-text">How labels changed</span>
+      <Fold id="compare" title="How labels changed" hint={relabel?.relabel?.waiting ? "re-labeling…" : undefined}>
         <button className="full" disabled={!previous || !latest} onClick={() => navigate(`/compare?from=${previous}&to=${latest}`)}>
           {previous && latest ? `Compare ${previous} → ${latest}` : "Compare previous → latest"}
         </button>
@@ -76,7 +76,7 @@ export function SidePanel() {
           <Link to="/versions">Manage versions</Link>
         </p>
         <RelabelProgress relabel={relabel} compact />
-      </section>
+      </Fold>
 
       {health?.demo?.enabled && <LiveRunSection health={health} />}
 

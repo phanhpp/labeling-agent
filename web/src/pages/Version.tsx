@@ -4,6 +4,7 @@ import { api, explain, type Policy, type Report } from "../api";
 import { RelabelProgress, useRelabel } from "../components/Relabel";
 import { ErrorNote, LabelBadge, SectionTag, color, useLoad } from "../components/ui";
 import { useShared } from "../context";
+import { person } from "../lib/words";
 
 export default function Version() {
   const { name = "" } = useParams();
@@ -27,8 +28,8 @@ export default function Version() {
         Policy {data.name} <span className={`status ${data.status}`}>{data.status}</span>
       </h1>
       <p className="muted">
-        {data.parent ? `Made from ${data.parent}` : "The first version"} · {who(data.author, "written")}
-        {data.edited_by.length > 0 && <> · edited by {data.edited_by.join(", ")}</>}
+        {data.parent ? `Made from ${data.parent}` : "The first version"} · {who(data.author, "created")}
+        {data.edited_by.length > 0 && <> · edited by {data.edited_by.map(person).join(", ")}</>}
         {data.published_by && <> · {who(data.published_by, "published")}</>}
       </p>
       {isDraft && user.role !== "viewer" && <Discard name={data.name} labels={data.test_labels ?? 0} notify={setMessage} />}
@@ -42,7 +43,7 @@ export default function Version() {
 }
 
 // "bootstrap" is the app loading policies/v1.yaml at startup, not a person.
-const who = (name: string, did: string) => (name === "bootstrap" ? `${did === "written" ? "loaded" : "published"} at startup` : `${did} by ${name}`);
+const who = (name: string, did: string) => (name === "bootstrap" ? `${did === "created" ? "loaded" : "published"} at startup` : `${did} by ${person(name)}`);
 
 // The three steps of a draft, and which are done.
 function DraftGuide({ policy }: { policy: Policy }) {
@@ -59,7 +60,7 @@ function DraftGuide({ policy }: { policy: Policy }) {
       <li className={policy.submitted_by ? "done" : ""}>
         <b>3. Submit, then publish</b>
         {policy.submitted_by
-          ? `Submitted by ${policy.submitted_by}. Waiting for a publisher who didn't edit it.`
+          ? `Submitted by ${person(policy.submitted_by)}. Waiting for a publisher who didn't edit it.`
           : "An editor submits it; a publisher who did not edit it publishes it. Recent postings are then labeled again."}
       </li>
     </ol>
@@ -244,7 +245,7 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
       )}
       {user.role === "editor" && !passed && <p className="hint">Submit needs a finished, passing Test of the current draft.</p>}
       {user.role === "publisher" && publishBlocked && <p className="hint" data-testid="publish-blocked">{publishBlocked}</p>}
-      {policy.submitted_by && <p className="hint">Submitted by {policy.submitted_by}{policy.submitted_at ? `, ${new Date(policy.submitted_at).toLocaleString()}` : ""}.</p>}
+      {policy.submitted_by && <p className="hint">Submitted by {person(policy.submitted_by)}{policy.submitted_at ? `, ${new Date(policy.submitted_at).toLocaleString()}` : ""}.</p>}
       {report && report.labeled + running > 0 ? (
         <FlipReport report={report} />
       ) : (

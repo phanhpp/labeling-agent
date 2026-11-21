@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { dollars, field, plural, location, modelName, reason, reasonSentence, relabelSentence, stepName } from "./words";
+import { dollars, field, plural, location, modelName, person, reason, reasonSentence, relabelSentence, stepName } from "./words";
 
 describe("plain words", () => {
+  it("shows a stored user id as a name", () => {
+    expect(person("eddie")).toBe("Eddie");
+    expect(person(null)).toBe("");
+  });
+
   it("puts reason codes into a sentence", () => {
     expect(reason("section_unsure")).toBe("Claude was unsure about a section");
     expect(reasonSentence(["review_section_matched", "section_unsure"])).toBe(

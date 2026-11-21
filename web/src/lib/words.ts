@@ -79,3 +79,6 @@ export function relabelSentence(version: string, r: RelabelCounts): string {
 
 // "1 false alarm", "2 false alarms".
 export const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+// A stored user id ("eddie") as the name people see ("Eddie").
+export const person = (id: string | null | undefined) => (id ? id.charAt(0).toUpperCase() + id.slice(1) : "");

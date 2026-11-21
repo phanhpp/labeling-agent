@@ -38,7 +38,7 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 
 ## Quick start
 
-You need Docker.
+You need Docker, and [uv](https://docs.astral.sh/uv/) for `make demo` (it sends the postings from your machine and downloads the dataset, 50 MB, on first run).
 
 **No keys, no cost** (a stand-in model labels by simple word rules):
 
@@ -51,7 +51,7 @@ open http://localhost:8000
 **Real models** (Claude and Jev):
 
 ```
-cp .env.example .env     # then add ANTHROPIC_API_KEY and TYPESAFE_API_KEY
+cp .env.example .env     # then add ANTHROPIC_API_KEY; TYPESAFE_API_KEY is optional (without it, Claude Haiku screens instead of Jev)
 make demo                # an empty database, 100 real postings labeled, v2 published, v3 as a draft (about $0.75)
 open http://localhost:8000
 ```

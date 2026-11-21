@@ -6,7 +6,8 @@ A system that labels job postings against a versioned fraud policy: a LangGraph 
 
 ```
 make up-fake seed     # the app with a stand-in model (no keys, no cost), plus sample data: http://localhost:8000
-make demo             # the app with Claude: 100 development postings, v1 and v2 published, v3 as a draft (needs keys in .env)
+make demo             # the app loaded with a saved Claude run: v1 and v2 labeled, v2 live, v3 a draft (keys only for Test and live runs)
+make demo-fresh       # the same start, labeled by Claude now (needs keys, about $0.75)
 make api / make worker / make web    # run the parts from source, with reload (UI on :5173)
 make test             # Python tests (models faked) and UI unit tests
 make lint             # ruff, ruff format, TypeScript

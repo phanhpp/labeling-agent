@@ -43,11 +43,13 @@ def main() -> None:
 
     # wait for the postings already sent, then Test on every one of them, so Publish keeps all the
     # Test's labels and runs nothing more
+    print("waiting for Claude to label the postings already sent...", flush=True)
     wait_for_queue(editor, timeout=900)
+    print(f"Testing {args.name} on every posting (about a minute; don't open the app yet)...", flush=True)
     editor.post(f"/policies/drafts/{args.name}/test", params={"limit": 1000}).raise_for_status()
     wait_for_queue(editor, timeout=900)
     report = editor.get(f"/policies/drafts/{args.name}/test").json()
-    print(f"{args.name} tested: {report['labeled']} postings, {len(report['flips'])} labels flip")
+    print(f"{args.name} tested: {report['labeled']} postings, {len(report['flips'])} labels flip", flush=True)
     if not report["passed"]:
         sys.exit(f"the Test did not pass, so {args.name} stays a draft: open {args.url}/versions/{args.name}")
     editor.post(f"/policies/drafts/{args.name}/submit").raise_for_status()

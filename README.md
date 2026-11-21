@@ -32,13 +32,13 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 
 **4. Evaluation.** Precision, recall and F1 for the fraud class, a confusion matrix with NEEDS_REVIEW as its own column, cost per 1,000 postings and p50/p95 latency, all on the 400 fixed test postings. NEEDS_REVIEW is counted both ways and the choice is explained. 9 errors are analysed, and a load test checks the 60-second target. The code is in `eval/`; the numbers are in [RESULTS.md](RESULTS.md).
 
-**5. Policy change demo.** Policy v2 adds a section (§6); `make demo` Tests and publishes it through the API, so the app starts with v1 and v2 to compare, and v3 waits as a draft to publish from the UI, with no code change; [Things to try](#things-to-try) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
+**5. Policy change demo.** Policy v2 adds a section (§6); `make demo` opens with it already published, so v1 and v2 can be compared at once, and v3 waits as a draft to Test and publish from the UI, with no code change; [Things to try](#things-to-try) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
 
 **One command to start:** `make demo`, or `docker compose up`. Keys are read from the environment, with a `.env.example`, and there are no secrets in the repo.
 
 ## Quick start
 
-You need Docker, and [uv](https://docs.astral.sh/uv/) for `make demo` (it sends the postings from your machine and downloads the dataset, 50 MB, on first run).
+You need Docker, and [uv](https://docs.astral.sh/uv/) for `make demo` (it loads the saved run from your machine and downloads the dataset, 50 MB, on first run).
 
 **No keys, no cost** (a stand-in model labels by simple word rules):
 
@@ -52,14 +52,16 @@ open http://localhost:8000
 
 ```
 cp .env.example .env     # then add ANTHROPIC_API_KEY; TYPESAFE_API_KEY is optional (without it, Claude Haiku screens instead of Jev)
-make demo                # an empty database, 100 real postings labeled, v2 published, v3 as a draft (about $0.75)
-open http://localhost:8000
+make demo                # loads a saved run labeled by Claude; nothing runs until you click (seconds, no cost)
+open http://localhost:8000   # once make demo prints "Ready"
 ```
+
+The key is only used when you click: a Test, or the live demo. Without one you can still look at everything. `make demo-fresh` makes the same start by labeling with Claude now instead (about $0.75 and 2 minutes).
 
 **What you see after `make demo`:**
 
-- 100 real postings from the development set, labeled by Claude under policy v1 and again under v2.
-- Policy v2 (adds §6) live, v1 kept as the previous version, and v3 (narrows §5) waiting as a draft.
+- 120 real postings, labeled by Claude in a saved run: 100 from the development set under policy v1 and again under v2, and 20 sent with the live demo under v2.
+- Policy v2 (adds §6) live, v1 kept as the previous version, and v3 (narrows §5) waiting as a draft. Nothing is running: a Test or a live run starts only when you click it.
 - You start as Vic, a viewer, who can only read. Switch to Eddie (editor) or Sam (publisher) under "You are" in the Workspace panel on the right.
 
 Next, [The analyst UI](#the-analyst-ui) says where things are and [Things to try](#things-to-try) walks through the demo.
@@ -99,7 +101,7 @@ After `make demo`, at [http://localhost:8000](http://localhost:8000):
 2. **Send new postings (Eddie):** open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
 3. **Compare with the dataset's label:** switch it on to see the dataset's answer next to ours, and which fraud was missed or legitimate posting wrongly flagged. The agent never sees it.
 4. **Compare versions:** "Showing policy" switches the list between v1's and v2's labels, without changing what is live. "How labels changed" in the Workspace shows v1 → v2: only the postings that changed, and why.
-5. **Change the policy (Eddie, then Sam):** open Versions, then draft v3 (narrows §5). As Eddie, Test it (the agent runs again on the 100 postings under v3: about $0.40 and a minute), read which labels would flip, and Submit. As Sam, Publish: the Test's labels are kept, so nothing runs again. "How labels changed" now shows v2 → v3.
+5. **Change the policy (Eddie, then Sam):** open Versions, then draft v3 (narrows §5). As Eddie, Test it (the agent runs again on the 120 postings under v3: about $0.45 and a minute), read which labels would flip, and Submit. As Sam, Publish: the Test's labels are kept, so nothing runs again. "How labels changed" now shows v2 → v3.
 6. **Switch what is live (Pat or Sam):** open v2 in Versions and click "Make v2 live again". Its labels are already there, so the switch is instant.
 7. **New postings follow the live policy:** send a few more; they are labeled under it at once.
 
@@ -112,7 +114,8 @@ Every `make` target is one or two plain commands; see the [Makefile](Makefile).
 | ---------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
 | **Run**          | `make up`                             | The database, API, UI and worker in Docker, on [http://localhost:8000](http://localhost:8000) |
 |                  | `make up-fake`                        | The same with the stand-in model: no keys, no cost                                            |
-|                  | `make demo`                           | A fresh start with real models: 100 postings, v1 and v2 published, v3 to Test (about $0.75)   |
+|                  | `make demo`                           | A fresh start from a saved real run: v1 and v2 labeled by Claude, v3 to Test (no cost)        |
+|                  | `make demo-fresh`                     | The same start, labeled by Claude now (about $0.75)                                           |
 |                  | `make down` / `make reset`            | Stop (data kept) / delete the local database                                                  |
 | **Demo helpers** | `make seed`                           | 14 sample postings, a decision and a draft, into any running app                              |
 |                  | `make demo-draft`                     | Load `policies/v3.yaml` as an untested draft                                                  |
@@ -221,7 +224,7 @@ It answers per section, for example: §1 matched, quote "buy the starter kit".
 
 - **Test set: 400 postings, 100 fraud.** Fixed by the assignment and used only for the results in RESULTS.md, never for prompts, examples or thresholds. They never enter the app's database, so nothing can be tuned on them by accident.
 - **Their copies: 586 postings.** The dataset repeats some ads under other ids. Tuning on a copy would mean tuning on the test, so every posting whose text matches one of the 400 is excluded everywhere.
-- **Development set: 300 postings, 75 fraud.** Where prompts were tuned and set-ups compared; `make demo` sends 100 of them to the app.
+- **Development set: 300 postings, 75 fraud.** Where prompts were tuned and set-ups compared; `make demo` opens with 100 of them labeled.
 - **Jev fitting set: 3,552 postings.** Used only to set Jev's two thresholds: when a posting can skip Claude, and when it is held as an injection.
 - **Everything else:** the live demo and the load test draw from any posting outside the 400 and their copies, so a demo never shows a test posting.
 

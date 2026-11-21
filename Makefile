@@ -1,6 +1,6 @@
 # Short names for the commands in the README. Each line is the plain command; nothing is hidden.
 
-.PHONY: up up-fake demo demo-draft seed down reset api worker web test e2e lint eval-dev guardrails results load-test demo-versions
+.PHONY: up up-fake demo demo-fresh demo-draft seed down reset api worker web test e2e lint eval-dev guardrails results load-test demo-versions
 
 up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 	docker compose up -d --build --wait
@@ -8,12 +8,19 @@ up:            ## everything in Docker: db, api (serves the UI on :8000), worker
 up-fake:       ## the same, with a fake model: no keys, no cost
 	LLM_BACKEND=fake docker compose up -d --build --wait
 
-demo:          ## a fresh stack: 100 real development postings labeled by Claude under v1, v2 tested and published, v3 as a draft (needs keys, about $0.75)
+demo:          ## a fresh stack loaded with a saved real run: 120 postings labeled by Claude, v2 live, v3 a draft. Nothing runs until you click (no cost to open)
+	docker compose down -v
+	docker compose up -d --build --wait
+	uv run python -m scripts.snapshot load
+	@echo "Ready: open http://localhost:8000"
+
+demo-fresh:    ## the same start, labeled now by Claude instead of loaded: 100 postings, v2 tested and published, v3 a draft (needs keys, about $0.75, 2 minutes)
 	docker compose down -v
 	docker compose up -d --build --wait
 	uv run python -m scripts.submit_postings --split dev --limit 100 --dataset-labels
 	uv run python -m scripts.demo_draft --publish
 	uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml
+	@echo "Ready: open http://localhost:8000"
 
 demo-draft:    ## load policy v3 (narrows §5) as an untested draft, to Test and publish in the UI
 	uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml

@@ -60,7 +60,7 @@ def main() -> None:
     labels = {
         item["job_id"]: item["id"] for item in editor.get("/ui/labels", params={"limit": 200}).json()["items"]
     }
-    decision = {"label": "NEEDS_REVIEW", "note": "Asked the employer to confirm the tool fee is refunded."}
+    decision = {"label": "NEEDS_REVIEW"}
     editor.post(f"/ui/labels/{labels['fx-fee']}/decision", json=decision).raise_for_status()
 
     body = policies.load_file(policies.POLICIES_DIR / "v2.yaml")

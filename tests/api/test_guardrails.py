@@ -49,7 +49,7 @@ async def test_every_route_refuses_a_request_without_a_token(api):
 async def test_the_wrong_role_is_forbidden(api):
     assert (await api.post("/v1/postings", json=POSTING, headers=as_("viewer"))).status_code == 403
     assert (await api.get("/ui/labels", headers=as_("marketplace"))).status_code == 403
-    decision = {"label": "ALLOWED", "note": ""}
+    decision = {"label": "ALLOWED"}
     assert (await api.post("/ui/labels/1/decision", json=decision, headers=as_("viewer"))).status_code == 403
 
 

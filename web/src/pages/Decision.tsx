@@ -146,7 +146,6 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
       {decision && (
         <div className="final" data-testid="analyst-decision">
           <b>Analyst decision: {decision.label.replace("_", " ").toLowerCase()}</b> (final) · {person(decision.analyst)}
-          {decision.note && <div>{decision.note}</div>}
         </div>
       )}
       {user.role !== "viewer" ? (
@@ -181,15 +180,14 @@ function confidenceTip(label: Detail): string {
 
 function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => void }) {
   const [choice, setChoice] = useState("NEEDS_REVIEW");
-  const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
   return (
     <form
       className="decide"
       onSubmit={(e) => {
         e.preventDefault();
-        api.decide(labelId, choice, note).then(
-          () => { setMessage("Decision recorded."); setNote(""); onDecided(); },
+        api.decide(labelId, choice).then(
+          () => { setMessage("Decision recorded."); onDecided(); },
           (err) => setMessage(explain(err)),
         );
       }}
@@ -200,7 +198,6 @@ function DecideForm({ labelId, onDecided }: { labelId: number; onDecided: () => 
         <option value="NEEDS_REVIEW">Needs review</option>
         <option value="ALLOWED">Allowed</option>
       </select>
-      <input aria-label="Note" placeholder="Note for the record" value={note} onChange={(e) => setNote(e.target.value)} />
       <button type="submit" className="primary">Record decision</button>
       {message && <p className="hint">{message}</p>}
     </form>

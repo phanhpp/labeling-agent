@@ -67,7 +67,7 @@ The key is only used when you click: a Test, or the live demo. Without one you c
 
 **What you see after `make demo`:**
 
-- 120 real postings, labeled by Claude in a saved run: 100 from the development set under policy v1 and again under v2, and 20 sent with the live demo under v2.
+- 120 real postings (100 from the development set, 20 from earlier live-demo runs), labeled by Claude in a saved run under policy v1 and again under v2.
 - Policy v2 (adds §6) live, v1 kept as the previous version, and v3 (narrows §5) waiting as a draft. Nothing is running: a Test or a live run starts only when you click it.
 - You start as Vic, a viewer, who can only read. Switch to Eddie (editor) or Sam (publisher) under "You are" in the Workspace panel on the right.
 
@@ -86,7 +86,7 @@ Next, [The analyst UI](#the-analyst-ui) says where things are and [Things to try
 
 **The other pages:**
 
-- **A posting** (click a row): the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here.
+- **A posting** (click a row): the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here: one of the three labels, picked from a list.
 - **Versions:** edit a draft (add or remove sections, change wording, examples and Jev's question), Test it on as many recent postings as you choose, read the flip report, Submit, Publish, roll back.
 - **Compare:** any two versions side by side, with only the postings that changed.
 

@@ -65,7 +65,7 @@ export type Detail = {
   screen: Record<string, any> | null; model_version: string; cleaned: Record<string, string>; facts: Record<string, any>;
   cost_usd: number; latency_ms: number; labeled_at: string; dataset: DatasetLabel;
   history: { id: number; policy_version: string; label: string; sections: string[]; created_at: string }[];
-  decisions: { label: string; note: string; analyst: string; policy_version: string; created_at: string }[];
+  decisions: { label: string; analyst: string; policy_version: string; created_at: string }[];
   job: { status: string } | null;
   api_answer: Record<string, unknown> | null;
 };
@@ -112,7 +112,7 @@ export const api = {
   batch: (id: number) => request<BatchSummary>(`/ui/batches/${id}`),
   label: (id: string) => request<Detail>(`/ui/labels/${id}`),
   steps: (postingId: number) => request<Steps>(`/ui/postings/${postingId}/steps`),
-  decide: (id: number, label: string, note: string) => request(`/ui/labels/${id}/decision`, json("POST", { label, note })),
+  decide: (id: number, label: string) => request(`/ui/labels/${id}/decision`, json("POST", { label })),
   versions: () => request<Version[]>("/policies"),
   version: (name: string, diff?: string | null) => request<Policy>(`/policies/${name}${diff ? `?diff=${diff}` : ""}`),
   createDraft: (name: string) => request<Version>("/policies/drafts", json("POST", { name })),

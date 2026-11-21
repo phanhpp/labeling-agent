@@ -3,7 +3,7 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app import store, versions
 from app.auth import EDIT, VIEW, User, require
@@ -118,8 +118,7 @@ async def steps(posting_id: int, request: Request, user: User = Depends(require(
 
 
 class DecisionIn(BaseModel):
-    label: Literal["VIOLATING", "ALLOWED", "NEEDS_REVIEW"]
-    note: str = Field("", max_length=2000)
+    label: Literal["VIOLATING", "ALLOWED", "NEEDS_REVIEW"]  # one of the three labels, no free text
 
 
 @router.post("/labels/{label_id}/decision", status_code=201)
@@ -131,6 +130,4 @@ async def decide(label_id: int, decision: DecisionIn, request: Request, user: Us
         ).fetchone()
         if label is None:
             raise HTTPException(404, "not_found")
-        return await store.record_decision(
-            conn, label["posting_id"], decision.label, decision.note, user.name
-        )
+        return await store.record_decision(conn, label["posting_id"], decision.label, user.name)

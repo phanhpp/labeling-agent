@@ -13,7 +13,7 @@ import random
 import httpx
 
 from app.auth import demo_token
-from app.dataset import CSV_PATH, read_rows
+from app.dataset import download, read_rows
 from scripts.load_data import SPLITS
 
 FIELDS_NOT_SENT = ("fraudulent",)  # the gold label: a marketplace doesn't know it
@@ -27,7 +27,7 @@ def postings(split: str, limit: int | None, seed: int = 42) -> list[dict]:
     if limit:
         ids = random.Random(seed).sample(ids, limit)
     wanted = set(ids)
-    rows = [row for row in read_rows(CSV_PATH) if row["job_id"] in wanted]
+    rows = [row for row in read_rows(download()) if row["job_id"] in wanted]
     return [{k: v for k, v in row.items() if k not in FIELDS_NOT_SENT} for row in rows]
 
 

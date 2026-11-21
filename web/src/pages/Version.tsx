@@ -180,7 +180,10 @@ const TEST_SIZES = [25, 50, 100, 200];
 // Test, Submit and Publish, each shown to the roles that may use it, with the reason when it can't
 // be used yet. The API checks every rule again.
 function DraftTools({ policy, unsaved, onChange, notify }: { policy: Policy; unsaved: any | null; onChange: () => void; notify: (m: string) => void }) {
-  const { user } = useShared();
+  const { user, live } = useShared();
+  // A draft is tested and published against the version it was made from. If another version went
+  // live since, the API refuses both, so say so before anyone clicks.
+  const stale = !!live && !!policy.parent && policy.parent !== live;
   const [report, setReport] = useState<Report | null>(null);
   const [polls, setPolls] = useState(0);
   // Publish labels these recent postings again, except those the Test labeled: testing all of them
@@ -213,6 +216,12 @@ function DraftTools({ policy, unsaved, onChange, notify }: { policy: Policy; uns
   return (
     <section className="card">
       <h2 className="card-title">Test and publish</h2>
+      {stale && (
+        <p className="message warn" data-testid="stale-draft">
+          {policy.name} was made from {policy.parent}, but {live} is live now, so it can't be tested or published. Discard it and
+          create a new draft from {live}{user.role !== "viewer" ? "" : " (an editor can)"}.
+        </p>
+      )}
       {canEdit ? (
         <div className="buttons">
           <label className="buttons">
@@ -223,6 +232,8 @@ function DraftTools({ policy, unsaved, onChange, notify }: { policy: Policy; uns
           </label>
           {running ? (
             <button onClick={() => act(() => api.stopTest(policy.name), "Test stopped. It stands on the postings labeled so far.")}>Stop the test</button>
+          ) : stale ? (
+            <button disabled>Test this draft</button>
           ) : unsaved ? (
             <button onClick={() => act(() => api.saveDraft(policy.name, unsaved).then(() => api.startTest(policy.name, size)), `Saved, and the Test started on up to ${size} recent postings.`)}>Save and test</button>
           ) : (
@@ -231,14 +242,14 @@ function DraftTools({ policy, unsaved, onChange, notify }: { policy: Policy; uns
           {user.role === "editor" && (
             <button
               className="primary"
-              disabled={!passed || !!policy.submitted_by || !!unsaved}
+              disabled={!passed || !!policy.submitted_by || !!unsaved || stale}
               onClick={() => act(() => api.submit(policy.name), "Submitted. A publisher needs to publish it.")}
             >
               {policy.submitted_by ? "Submitted" : "Submit for publishing"}
             </button>
           )}
           {user.role === "publisher" && (
-            <button className="primary" disabled={!!publishBlocked || !!unsaved} title={publishBlocked}
+            <button className="primary" disabled={!!publishBlocked || !!unsaved || stale} title={publishBlocked}
               onClick={() => act(() => api.publish(policy.name), "Published. Recent postings the Test didn't cover are being labeled again.")}>
               Publish
             </button>

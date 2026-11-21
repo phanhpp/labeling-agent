@@ -12,7 +12,7 @@ demo:          ## a fresh stack loaded with a saved real run: 120 postings label
 	docker compose down -v
 	docker compose up -d --build --wait
 	uv run python -m scripts.snapshot load
-	@echo "Ready: open http://localhost:8000"
+	@echo "Ready: open http://localhost:$${API_PORT:-8000}"
 
 demo-fresh:    ## the same start, labeled now by Claude instead of loaded: 100 postings, v2 tested and published, v3 a draft (needs keys, about $0.75, 2 minutes)
 	docker compose down -v
@@ -20,7 +20,7 @@ demo-fresh:    ## the same start, labeled now by Claude instead of loaded: 100 p
 	uv run python -m scripts.submit_postings --split dev --limit 100 --dataset-labels
 	uv run python -m scripts.demo_draft --publish
 	uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml
-	@echo "Ready: open http://localhost:8000"
+	@echo "Ready: open http://localhost:$${API_PORT:-8000}"
 
 demo-draft:    ## load policy v3 (narrows §5) as an untested draft, to Test and publish in the UI
 	uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml

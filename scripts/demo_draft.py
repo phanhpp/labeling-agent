@@ -3,8 +3,8 @@
 uv run python -m scripts.demo_draft --publish   # v2 (adds §6): Test, Submit as Eddie, Publish as Sam
 uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml   # an untested draft, for the UI
 
-`make demo` runs the first: the app starts with v1 previous and v2 live, so "How labels changed"
-has something to show.
+`make demo` runs both: the app starts with v1 previous and v2 live, so "How labels changed" has
+something to show, and v3 is the draft to Test and publish in the session.
 """
 
 import argparse

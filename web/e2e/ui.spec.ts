@@ -293,12 +293,26 @@ test("only a publisher can make an older version live again", async ({ page }) =
   await expect(page.getByRole("button", { name: "Make v1 live again" })).toHaveCount(0);
   await expect(page.getByTestId("rollback-hint")).toContainText("A publisher can make v1 live again");
 
+  await page.goto("/versions/v2");
+  await page.getByRole("button", { name: /^Create a draft from v2/ }).click(); // a draft made from v2
+  await expect(page.getByRole("heading", { name: /Policy v3/ })).toBeVisible();
+  await expect(page.getByTestId("stale-draft")).toHaveCount(0);
+
+  await page.goto("/versions/v1");
   await actAs(page, "publisher_b");
   await page.getByRole("button", { name: "Make v1 live again" }).click();
   await expect(page.getByText("v1 is live again.")).toBeVisible();
+  await page.goto("/versions/v3"); // its version is no longer live: said before anyone clicks Test
+  await expect(page.getByTestId("stale-draft")).toContainText("v3 was made from v2, but v1 is live now");
+  await expect(page.getByRole("button", { name: "Test this draft" })).toBeDisabled();
   await page.goto("/versions/v2"); // put v2 back, for the tests after this one
   await page.getByRole("button", { name: "Make v2 live again" }).click();
   await expect(page.getByText("v2 is live again.")).toBeVisible();
+  await page.goto("/versions/v3");
+  await expect(page.getByTestId("stale-draft")).toHaveCount(0);
+  await page.getByRole("button", { name: "Discard this draft" }).click();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(page.getByText("Draft v3 discarded.")).toBeVisible();
 });
 
 // Last: it adds postings. It needs the dataset CSV (make demo downloads it; CI doesn't have it).

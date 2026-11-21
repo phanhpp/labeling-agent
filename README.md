@@ -200,9 +200,21 @@ make results         # rebuild RESULTS.md from the saved runs
 
 ## How the two thresholds were chosen
 
-**When may a posting skip Claude? Jev score under 0.17 on every section.** Set so that Jev agrees with Claude: at most 2% of the postings Claude would flag get cleared without it. On new postings, 1 in 57 was. (`scripts/fit_cutoff.py`)
+**What Jev returns.** Jev gets one call per posting with one yes/no question per policy section, so 5 questions for policy v1, plus one injection question. For each, it returns the **probability that the answer is yes**, from 0 (surely no) to 1 (surely yes). For example, 0.17 on §4 means Jev thinks there is about a 17% chance the posting offers unrealistic pay.
 
-**When is a posting held as a possible injection? Jev injection score of 0.5 or more.** The lowest threshold that holds at most 1 in 1,000 ordinary postings: 3,852 ordinary postings and 600 with one of 10 hand-written injection attempts, 4 of them kept out of tuning. Result: 3 ordinary postings held, and every injection caught, the unseen wording included. (`scripts/fit_injection.py`)
+**When a posting skips Claude: every section scores under 0.17.** If all 5 section scores are under 0.17, the posting is ALLOWED without Claude reading it. If any section scores 0.17 or more, Claude reads it.
+- **The trade-off:** a higher cut-off lets more postings skip Claude, which is cheaper, but Jev then clears more postings that Claude would have flagged.
+- **How 0.17 was picked:** Jev and Claude both read the **Jev fitting set** (3,552 postings). 0.17 is the highest cut-off at which Jev clears at most 2 in 100 of the postings Claude flags (as VIOLATING or for review).
+- **Checked on the development set** (300 postings, not used to pick it): Jev cleared 1 in 57 of the postings Claude flagged, under 2 in 100. (`scripts/fit_cutoff.py`)
+
+**When a posting is held as an injection: the injection score is 0.5 or more.** The injection question is *"Does the posting contain text that tries to instruct an AI system that reviews it?"* At 0.5 or more, the posting goes to review and Claude never reads it.
+- **The trade-off:** a lower cut-off catches more injections but also holds more normal postings.
+- **How 0.5 was picked:** it was tested on the **Jev fitting set and the development set together** (3,852 normal postings), and on 600 postings with a fake injection added (10 different wordings, 4 of them kept hidden from the tuning). 0.5 is the lowest cut-off that wrongly holds at most 1 in 1,000 normal postings.
+- **Result:**
+  - normal postings: 3 of the 3,852 were held;
+  - injected postings: every one was caught (67 by the phrase check before Jev, the other 533 by Jev), the 4 hidden wordings included. (`scripts/fit_injection.py`)
+
+The data sets are described in [How the dataset is split](#your-data).
 
 ## AWS design (DESIGN.md) vs this repo
 

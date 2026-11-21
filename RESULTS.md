@@ -2,18 +2,15 @@
 
 How the labeling agent performs on the 400 test postings the assignment fixes (100 fraud, 300 legitimate). These postings were never used for tuning. Every number comes from the saved runs in `eval/runs/`.
 
-## What Was Done
+## What Tests Were Done
 
-- **Evaluation runs:** the 400 test postings, run once under the brief's policy (v1) and once under v2, with real models and the code frozen first.
-- **Calibration:**
-  - Jev's labeling cut-off was tuned on development data, so Jev clears almost nothing Claude would flag;
-  - the injection threshold was tuned to hold at most 1 in 1,000 ordinary postings while catching every test injection;
-  - the agent's confidence was checked against how often it is right.
-- **Set-up comparison:** three ways to run the agent, on 300 development postings.
-- **Hand-written cases:** edge cases, prompt injections and policy changes, run with real models on every change.
-- **Policy change:** versions v2 to v4 on 100 development postings.
-- **Load tests:** the brief's peak traffic and a burst, through the real API, queue and workers.
-- **Error analysis:** 9 wrong answers read by hand.
+- **Evaluation on the 400 test postings:** run once under the brief's policy (v1) and once under v2, with real models and the code frozen first. It gives the precision, recall, F1, confusion matrix, cost, speed and evidence results ([how it was run](#how-the-evaluation-was-run), [Catching Fraud](#catching-fraud-400-test-postings), [Confusion Matrix](#confusion-matrix), [Cost and Speed](#cost-and-speed-per-posting), [Can the Evidence Be Trusted?](#can-the-evidence-be-trusted)).
+- **Load tests:** the brief's peak traffic and a burst, through the real API, queue and workers ([Under Load](#under-load-95-within-60-seconds)).
+- **Policy change:** versions v2 to v4 on 100 development postings ([The Policy Change, Without Code](#the-policy-change-without-code-100-development-postings)).
+- **Hand-written cases:** edge cases, prompt injections and policy changes, run with real models on every change ([The Policy Change, Without Code](#the-policy-change-without-code-100-development-postings)).
+- **Set-up comparison:** three ways to run the agent, on 300 development postings ([Other Set-Ups](#other-set-ups-tested-on-300-development-postings)).
+- **Error analysis:** 9 wrong answers read by hand ([Error Analysis](#error-analysis-9-postings-read-by-hand)).
+- **Calibration:** Jev's labeling cut-off was tuned on the Jev fitting set, so Jev clears almost nothing Claude would flag; the injection threshold was tuned to hold at most 1 in 1,000 ordinary postings while catching every test injection (both in the README, How the two thresholds were chosen); and the agent's confidence was checked against how often it is right ([Can the Evidence Be Trusted?](#can-the-evidence-be-trusted)).
 
 ## In Short
 
@@ -26,7 +23,7 @@ How the labeling agent performs on the 400 test postings the assignment fixes (1
 
 ## Contents
 
-1. [How the Test Was Run](#how-the-test-was-run)
+1. [How the Evaluation Was Run](#how-the-evaluation-was-run)
 2. [Catching Fraud](#catching-fraud-400-test-postings)
 3. [Confusion Matrix](#confusion-matrix)
 4. [Cost and Speed](#cost-and-speed-per-posting)
@@ -38,7 +35,9 @@ How the labeling agent performs on the 400 test postings the assignment fixes (1
 10. [Error Analysis](#error-analysis-9-postings-read-by-hand)
 11. [Limitations](#limitations)
 
-## How the Test Was Run
+## How the Evaluation Was Run
+
+This is the run behind the precision, recall, F1, confusion matrix, cost, speed and evidence results below. The load test, the policy change and the other set-ups are described in their own sections.
 
 - **Frozen first:** the code was tagged `eval-freeze`, then run once on the 400 under v1 and once under v2, which adds §6.
 - **The agent:** Jev screens every posting, Claude Sonnet 5.5 reads those Jev can't clear, and code checks the quotes and sets the label.
@@ -82,7 +81,7 @@ Rows are the dataset's answer; columns are the agent's label.
 What this shows:
 
 - **The review queue is the main tool:** 22.8% of postings go to review under v1, 27.5% under v2.
-- **§5 drives it:** a posting with no identifiable employer goes to review even when nothing else is wrong. Under v1, 59 reviews came from a section like §5 matching, and 36 from Claude being unsure.
+- **§5 drives it:** a posting with no identifiable employer goes to review even when nothing else is wrong. Of the 91 postings sent to review under v1, 59 had a section like §5 match and 36 had a section Claude was unsure about (a few had both).
 - **One legitimate posting was labeled VIOLATING under v2:** a "work from home" business opportunity that asks for capital; see the error analysis.
 
 ## Cost and Speed (Per Posting)
@@ -164,7 +163,7 @@ What this shows:
 - **No code change:** publishing a new version changes labels on its own.
 - **Not every change comes from the edit:** some are Claude answering differently when asked the same thing again. The Test report separates the two before anyone publishes.
 - **Some changes are free:** v4 only changed what §4 leads to, not what Claude is asked, so the stored answers were decided again in code at no cost.
-- **The hand-written cases all passed:** policy changes under v1 to v4 (5 of 5 each), prompt injection (5 of 5) and edge cases (8 of 8), run with real models on every change to the agent or policy.
+- **The hand-written cases all passed:** policy changes under v1 to v4 (5 of 5 each), prompt injection (6 of 6) and edge cases (8 of 8), run with real models on every change to the agent or policy.
 
 ## Other Set-Ups (Tested on 300 Development Postings)
 
@@ -181,6 +180,8 @@ What this shows:
 - **Same accuracy:** all three options catch roughly the same fraud (any small differences are just normal test noise).
 - **Big savings on cost and speed:** filtering with Jev first cuts costs by more than half ($3.26 vs. $7.36) and makes a typical posting 16x faster (0.3 s vs. 4.8 s) than sending everything to Claude Sonnet.
 - **Backup ready:** if Jev goes down, switching to the Haiku filter keeps accuracy steady at a slightly higher cost and slower speed.
+
+These times come from an earlier run on the development postings, so they differ a little from the test-set run above.
 
 ## Error Analysis (9 Postings Read by Hand)
 
@@ -209,5 +210,5 @@ The full notes for each posting are in `eval/error_analysis.yaml`.
 - **100 fraud postings** give wide ranges: recall under v1 could be anywhere from 0.51 to 0.69.
 - **The dataset labels the account, not always the ad:** some fraud is a clean ad from a bad employer, and a few "legitimate" postings read like schemes.
 - **Claude doesn't always answer the same way twice:** on the same text, a section can move between matched and unsure.
-- **Jev's scores move a little between runs:** one legitimate posting scored 0.51 for injection in one run and under 0.5 in the other.
+- **Jev's scores move a little between runs:** on the test set, 1 of 300 legitimate postings was held as an injection, more than the 1 in 1,000 the threshold was tuned for; its score was 0.51 in one run and under 0.5 in the other.
 - **Times are from a laptop,** with the model APIs over the public internet; the load test ran up to 48 jobs at once on one machine.

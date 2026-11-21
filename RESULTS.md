@@ -145,7 +145,7 @@ What this shows:
 Under v1, 41 fraud postings were labeled ALLOWED. They look like ordinary ads: no fee, no request for bank details, no unrealistic pay, and 27 of them have a logo and a full company profile. So did the agent miss something, or does the policy not cover them? Three checks say it's the policy:
 
 1. **It isn't the screen.** With Claude reading every posting and no Jev, it allowed almost the same fraud (38 against 39, on the 300 development postings).
-2. **Changing the policy catches some.** v2 adds §6, for a company's text copied with no profile or logo of its own. It catches 7 of the 41, at the cost of 13 more legitimate postings sent to review. (It caught more on the development postings, but §6 was written from those, so this test set is the fair measure.)
+2. **Changing the policy catches some.** v2 adds §6, for a company's text copied with no profile or logo of its own. It newly catches 7 of the 41, but stops flagging 1 other, so 6 more fraud postings are flagged in all (59 to 65). The cost: 13 legitimate postings newly flagged and 1 no longer, so 12 more in all (45 to 57). (It caught more on the development postings, but §6 was written from those, so this test set is the fair measure.)
 3. **The real signal is the employer.** 27 of the 41 share their company profile with other postings that are all fraud, and no legitimate posting in the test set does. Checking the employer's history would catch them with no new false alarms: 86 of 100 fraud flagged. That's the next thing to build. (An estimate from the dataset's labels; in production, the history would be the marketplace's confirmed takedowns.)
 
 ## The Policy Change, Without Code (100 Development Postings)

@@ -2,6 +2,8 @@
 # read by hand after the run. Written once, after the freeze: nothing here fed back into prompts,
 # examples or thresholds. eval/report.py puts them in RESULTS.md.
 #
+# summary is the one-line reason shown in RESULTS.md; note is the full reading.
+#
 # category is one of:
 #   cleared_by_screen   fraud the Jev screen scored low on every section, so Claude never read it
 #   policy_silent       fraud that does nothing the policy describes
@@ -11,6 +13,7 @@
 #   debatable_gold      the dataset's label is arguable; ours follows the policy
 
 - id: "2137"
+  summary: "Copies a real company's overview (Aker Solutions), with a logo and a full profile, so Jev cleared it. Its profile appears on 31 other postings, all fraud."
   run: v1
   gold: fraud
   label: ALLOWED
@@ -22,6 +25,7 @@
     dataset, all fraud: a check of the employer's other postings would catch it.
 
 - id: "3056"
+  summary: "A real company's job text (Puget Sound Energy) pasted in, with no logo or profile. v1 has no rule for it; v2's §6 catches it."
   run: v1
   gold: fraud
   label: ALLOWED
@@ -32,6 +36,7 @@
     of miss a policy change fixes without code.
 
 - id: "2274"
+  summary: "A plausible work-from-home customer service job. Nothing in the ad breaks a rule; its profile appears on 12 other postings, all fraud."
   run: v1
   gold: fraud
   label: ALLOWED
@@ -43,6 +48,7 @@
     fraud: the fraud is in who posted it, not in what the ad says.
 
 - id: "662"
+  summary: "A polished \"Director of Strategy\" ad. Claude found nothing the policy names; its profile appears on 35 other postings, all fraud."
   run: v1
   gold: fraud
   label: ALLOWED
@@ -54,6 +60,7 @@
     Under v2 Claude marked §5 unsure (review), a different answer to the same text, not the change.
 
 - id: "3612"
+  summary: "A commission-only sales job with the pay stated plainly, which the policy explicitly allows."
   run: v1
   gold: fraud
   label: ALLOWED
@@ -65,6 +72,7 @@
     fraud).
 
 - id: "434"
+  summary: "A three-line contract ad with no employer named, so §5 sends it to review. 44 of the 45 false alarms are like this."
   run: v1
   gold: legit
   label: NEEDS_REVIEW
@@ -75,6 +83,7 @@
     false alarms under v1 are §5 like this one: short, legitimate agency ads that name no company.
 
 - id: "569"
+  summary: "\"English Teacher Abroad: play with kids, get paid for it\", a tiny profile and a personal name. Marked legitimate, but worth an analyst's look."
   run: v1
   gold: legit
   label: NEEDS_REVIEW
@@ -86,6 +95,7 @@
     (177), both held for review.
 
 - id: "10628"
+  summary: "An ordinary web developer ad that Jev scored 0.51 for injection, just over the 0.5 line, so it was held. In the v2 run it scored under 0.5."
   run: v1
   gold: legit
   label: NEEDS_REVIEW
@@ -97,6 +107,7 @@
     here 1 of 300 (0.3%). The cost of a false hold is one analyst look, not a wrong label.
 
 - id: "3174"
+  summary: "A \"work from home\" business opportunity that requires capital investment. Labeling it VIOLATING under §1 is defensible; the dataset says legitimate."
   run: v2
   gold: legit
   label: VIOLATING

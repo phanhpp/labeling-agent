@@ -47,7 +47,7 @@ export function SidePanel() {
             ))}
           </select>
         </label>
-        <p>{user.name} {user.can}.</p>
+        <p>{user.name} can: {user.can}.</p>
       </section>
 
       <section>

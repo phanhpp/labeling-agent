@@ -22,6 +22,20 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 
 [DESIGN.md](DESIGN.md) is the design for running this on AWS (Part A). This repo runs the same system on your machine (Part B). [RESULTS.md](RESULTS.md) has the measured results.
 
+## How this repo meets the brief
+
+**1. Labeling agent.** A LangGraph agent reads the policy at run time and returns the brief's JSON: job id, label, sections, evidence, rationale, confidence and policy version. Every quote is checked word for word against the posting, and code, not the model, sets the label. The code is in `app/agent/`; any posting in the UI shows its JSON answer.
+
+**2. Backend and API.** Postings come in one at a time (`POST /v1/postings`) or in batches of up to 500 (`POST /v1/postings/batch`), and their labels are read back with `GET /v1/postings/{id}/label`. Policy versions are drafted, tested, published and rolled back through `/policies`. A queue and parallel workers do the labeling. The code is in `app/api/`, `app/queue.py` and `app/worker.py`; every endpoint is listed at http://localhost:8000/docs.
+
+**3. Analyst UI.** Analysts browse labeled postings with the evidence highlighted, filter by label or section, open a single decision, and edit and publish policy versions. It also compares versions, has roles, and runs a live demo. The code is in `web/src/`; it runs at http://localhost:8000.
+
+**4. Evaluation.** Precision, recall and F1 for the fraud class, a confusion matrix with NEEDS_REVIEW as its own column, cost per 1,000 postings and p50/p95 latency, all on the 400 fixed test postings. NEEDS_REVIEW is counted both ways and the choice is explained. 9 errors are analysed, and a load test checks the 60-second target. The code is in `eval/`; the numbers are in [RESULTS.md](RESULTS.md).
+
+**5. Policy change demo.** Policy v2 adds a section (§6) and is published from the UI, with no code change; [The live demo](#the-live-demo) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
+
+**Also asked:** one command to start (`make demo`, or `docker compose up`), keys read from the environment with a `.env.example`, and no secrets in the repo. The Part A design is in [DESIGN.md](DESIGN.md).
+
 ## Quick start
 
 You need Docker.

@@ -244,6 +244,20 @@ test("an editor discards a draft; published versions have no discard", async ({ 
   await expect(page.getByRole("button", { name: "Discard this draft" })).toHaveCount(0);
 });
 
+test("only a publisher can make an older version live again", async ({ page }) => {
+  await page.goto("/versions/v1"); // v1 is retired: the role demo published v2
+  await actAs(page, "editor");
+  await expect(page.getByRole("button", { name: "Make v1 live again" })).toHaveCount(0);
+  await expect(page.getByTestId("rollback-hint")).toContainText("A publisher can make v1 live again");
+
+  await actAs(page, "publisher_b");
+  await page.getByRole("button", { name: "Make v1 live again" }).click();
+  await expect(page.getByText("v1 is live again.")).toBeVisible();
+  await page.goto("/versions/v2"); // put v2 back, for the tests after this one
+  await page.getByRole("button", { name: "Make v2 live again" }).click();
+  await expect(page.getByText("v2 is live again.")).toBeVisible();
+});
+
 // Last: it adds postings. It needs the dataset CSV (make demo downloads it; CI doesn't have it).
 test("the live demo sends real postings, follows the run, and compares with the dataset", async ({ page, request }) => {
   const health = await (await request.get("/health")).json();

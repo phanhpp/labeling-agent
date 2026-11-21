@@ -81,7 +81,13 @@ Next, [The analyst UI](#the-analyst-ui) says where things are and [Things to try
 - **Versions:** edit a draft (add or remove sections, change wording, examples and Jev's question), Test it on as many recent postings as you choose, read the flip report, Submit, Publish, roll back.
 - **Compare:** any two versions side by side, with only the postings that changed.
 
-**The roles:** Vic (viewer) reads. Eddie (editor) edits drafts, Tests and Submits them, records decisions and sends live-demo postings. Pat and Sam (publishers) can also Publish and make an older version live again; whoever edited a draft can't publish it, so a second person always checks.
+**Who can do what** (switch under "You are" in the Workspace):
+
+- **Everyone, including Vic (viewer):** browse and open postings, view any version's labels, compare versions, compare with the dataset's label.
+- **Eddie (editor):** also sends live-demo postings, records decisions, and creates, edits, Tests, Submits and discards drafts.
+- **Pat and Sam (publishers):** also Publish a draft and make an older version live again. Whoever edited a draft can't publish it, so a second person always checks.
+
+"Showing policy" only changes which labels you look at. Only a publisher can change which version is live.
 
 ### Things to try
 

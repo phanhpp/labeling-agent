@@ -32,7 +32,7 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 
 **4. Evaluation.** Precision, recall and F1 for the fraud class, a confusion matrix with NEEDS_REVIEW as its own column, cost per 1,000 postings and p50/p95 latency, all on the 400 fixed test postings. NEEDS_REVIEW is counted both ways and the choice is explained. 9 errors are analysed, and a load test checks the 60-second target. The code is in `eval/`; the numbers are in [RESULTS.md](RESULTS.md).
 
-**5. Policy change demo.** Policy v2 adds a section (§6) and is published from the UI, with no code change; [The live demo](#the-live-demo) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
+**5. Policy change demo.** Policy v2 adds a section (§6); `make demo` Tests and publishes it through the API, so the app starts with v1 and v2 to compare, and v3 waits as a draft to publish from the UI, with no code change; [The live demo](#the-live-demo) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
 
 **One command to start:** `make demo`, or `docker compose up`. Keys are read from the environment, with a `.env.example`, and there are no secrets in the repo.
 
@@ -52,7 +52,7 @@ open http://localhost:8000
 
 ```
 cp .env.example .env     # then add ANTHROPIC_API_KEY and TYPESAFE_API_KEY
-make demo                # an empty database, 100 real postings labeled (about $0.35), policy v2 loaded as a draft
+make demo                # an empty database, 100 real postings labeled, v2 published, v3 as a draft (about $0.75)
 open http://localhost:8000
 ```
 
@@ -67,10 +67,10 @@ Every `make` target is one or two plain commands; see the [Makefile](Makefile).
 | ---------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
 | **Run**          | `make up`                             | The database, API, UI and worker in Docker, on [http://localhost:8000](http://localhost:8000) |
 |                  | `make up-fake`                        | The same with the stand-in model: no keys, no cost                                            |
-|                  | `make demo`                           | A fresh start with real models: 100 postings labeled, policy v2 ready to Test (about $0.35)   |
+|                  | `make demo`                           | A fresh start with real models: 100 postings, v1 and v2 published, v3 to Test (about $0.75)   |
 |                  | `make down` / `make reset`            | Stop (data kept) / delete the local database                                                  |
 | **Demo helpers** | `make seed`                           | 14 sample postings, a decision and a draft, into any running app                              |
-|                  | `make demo-draft`                     | Load `policies/v2.yaml` as an untested draft                                                  |
+|                  | `make demo-draft`                     | Load `policies/v3.yaml` as an untested draft                                                  |
 |                  | `make guardrails`                     | Show the API refusing bad requests and holding an injection                                   |
 | **Develop**      | `make api`, `make worker`, `make web` | Each part from source with live reload (the UI on :5173)                                      |
 | **Test**         | `make test`                           | Python tests (models faked) and the UI's unit tests                                           |
@@ -181,8 +181,9 @@ After `make demo`, at [http://localhost:8000](http://localhost:8000):
 
 1. **New postings arrive:** as Eddie (editor), open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
 2. **Check against the dataset:** switch on "Compare with the dataset's label" to see the dataset's own answer next to ours. The agent never sees it.
-3. **Change the policy:** open Versions, then draft v2 (adds §6). As Eddie, Test it and Submit; as Sam (publisher), Publish. When the re-label is done, "Compare v1 → v2" shows what changed.
-4. **New postings follow the new policy:** send a few more; they are labeled under v2 at once.
+3. **See a published change:** the app starts with v2 live (adds §6) and v1 kept as the previous version. "How labels changed" in the Workspace compares v1 → v2.
+4. **Change the policy yourself:** open Versions, then draft v3 (narrows §5). As Eddie, Test it and Submit; as Sam (publisher), Publish. When the re-label is done, "How labels changed" v2 → v3 shows the difference. As Pat or Sam, "Make v2 live again" rolls back.
+5. **New postings follow the new policy:** send a few more; they are labeled under the live version at once.
 
 
 

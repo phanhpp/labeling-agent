@@ -6,12 +6,15 @@ A system that labels job postings against a versioned fraud policy: a LangGraph 
 
 ```
 make up-fake seed     # the app with a stand-in model (no keys, no cost), plus sample data: http://localhost:8000
-make demo             # the app with Claude: 100 development postings labeled, policy v2 as a draft (needs keys in .env)
+make demo             # the app with Claude: 100 development postings, v1 and v2 published, v3 as a draft (needs keys in .env)
 make api / make worker / make web    # run the parts from source, with reload (UI on :5173)
 make test             # Python tests (models faked) and UI unit tests
 make lint             # ruff, ruff format, TypeScript
 make up-fake seed e2e # browser tests (Playwright) against a running sample stack
 make reset            # delete the local demo database
+make guardrails       # the API refusing bad requests and holding an injection, against the running app
+make results          # rebuild RESULTS.md from eval/runs/ and check it matches
+make load-test        # the 60 s target under the 5x peak and a burst (needs keys, about $1.50)
 ```
 
 Python uses `uv` (`uv run pytest`, `uv run python -m scripts.<name>`); the UI uses `pnpm -C web`.

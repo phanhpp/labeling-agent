@@ -181,11 +181,12 @@ async def test_report(conn: AsyncConnection, name: str) -> dict:
         await conn.execute(
             """
             SELECT n.id, n.posting_id, p.job_id, n.label, n.sections, n.evidence, n.cleaned, n.reason_codes,
-                   n.cost_usd, n.derived_from, o.label AS live_label, o.sections AS live_sections
+                   n.cost_usd, n.derived_from, o.id AS live_label_id, o.label AS live_label,
+                   o.sections AS live_sections
             FROM labels n
             JOIN postings p ON p.id = n.posting_id
             LEFT JOIN LATERAL (
-                SELECT label, sections FROM labels
+                SELECT id, label, sections FROM labels
                 WHERE posting_id = n.posting_id AND policy_version = %s ORDER BY created_at DESC LIMIT 1
             ) o ON true
             WHERE n.policy_version = %s AND n.policy_hash = %s
@@ -204,7 +205,8 @@ async def test_report(conn: AsyncConnection, name: str) -> dict:
                 {
                     "posting_id": row["posting_id"],
                     "job_id": row["job_id"],
-                    "label_id": row["id"],
+                    "label_id": row["id"],  # the draft's label
+                    "live_label_id": row["live_label_id"],  # what anyone sees now: the report links here
                     "before": {"label": row["live_label"], "sections": row["live_sections"]},
                     "after": {"label": row["label"], "sections": row["sections"]},
                     "from_the_change": _from_the_change(row, changed_codes),

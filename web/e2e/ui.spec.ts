@@ -244,6 +244,49 @@ test("an editor discards a draft; published versions have no discard", async ({ 
   await expect(page.getByRole("button", { name: "Discard this draft" })).toHaveCount(0);
 });
 
+test("unsaved draft edits: the page says so, and Test saves them first", async ({ page }) => {
+  await page.goto("/versions");
+  await actAs(page, "editor");
+  await page.getByRole("button", { name: /^Create a draft from v2/ }).click();
+  await expect(page.getByRole("heading", { name: /Policy v3/ })).toBeVisible();
+  await page.getByRole("button", { name: "Open all sections" }).first().click();
+  const s5 = page.locator("details.sec-block", { hasText: "Unverifiable employer" }).last();
+  await s5.getByRole("button", { name: "Remove this section" }).click();
+  await s5.getByRole("button", { name: "Remove", exact: true }).click();
+  await expect(page.getByTestId("unsaved")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit for publishing" })).toBeDisabled();
+  await page.getByRole("button", { name: "Save and test" }).click();
+  await expect(page.getByText(/^Saved, and the Test started/)).toBeVisible();
+  await expect(page.getByTestId("unsaved")).toHaveCount(0);
+  await expect(page.locator(".changes")).toContainText("§5 removed"); // what was saved
+  await expect(page.locator("details.sec-block", { hasText: "Unverifiable employer" })).toHaveCount(0); // stays removed
+  await expect(page.getByTestId("flip-report")).toContainText("Test passed.");
+  const link = page.getByTestId("flip-report").locator("tbody a").first();
+  if (await link.count()) {
+    await link.click(); // a changed job opens the live label, where decisions are made
+    await expect(page.getByTestId("draft-label")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Record decision" })).toBeVisible();
+  }
+  await page.goto("/versions/v3");
+  await page.getByRole("button", { name: "Discard this draft" }).click();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect(page.getByText("Draft v3 discarded.")).toBeVisible();
+});
+
+test("every visit starts on the live version, and a new tab as Vic", async ({ page }) => {
+  await page.goto("/");
+  await actAs(page, "editor");
+  await page.getByLabel("Policy shown").selectOption("v1");
+  await expect(page.locator("header").first()).toContainText("live is v2");
+  await page.reload();
+  await expect(page.getByLabel("Policy shown")).toHaveValue("v2");
+  await expect(page.getByLabel("Acting as")).toHaveValue("editor"); // a reload keeps the role
+  const fresh = await page.context().newPage();
+  await fresh.goto("/");
+  await expect(fresh.getByLabel("Acting as")).toHaveValue("viewer"); // a new tab starts as Vic
+  await fresh.close();
+});
+
 test("only a publisher can make an older version live again", async ({ page }) => {
   await page.goto("/versions/v1"); // v1 is retired: the role demo published v2
   await actAs(page, "editor");

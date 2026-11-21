@@ -72,7 +72,9 @@ export function SharedProvider({ children }: { children: ReactNode }) {
     return u;
   });
   const [versions, setVersions] = useState<Tagged[]>([]);
-  const [viewing, setViewingState] = useState<string | null>(() => stored("viewing", null));
+  // Not remembered between visits: every visit starts on the live version, so nobody lands on an old
+  // one by surprise (another app at the same address, or a choice made days ago).
+  const [viewing, setViewingState] = useState<string | null>(null);
   const [sections, setSections] = useState<Record<string, string>>({});
   // Open by default on a wide screen; on a phone it would cover the page, so it starts folded.
   const [panelOpen, setPanelOpenState] = useState<boolean>(
@@ -84,10 +86,7 @@ export function SharedProvider({ children }: { children: ReactNode }) {
     saveUser(u);
     setUserState(u);
   };
-  const setViewing = (name: string | null) => {
-    store("viewing", name);
-    setViewingState(name);
-  };
+  const setViewing = (name: string | null) => setViewingState(name);
   const [panelWidth, setPanelWidthState] = useState<number>(() => Number(stored("panel-width", "280")) || 280);
   const setPanelWidth = (px: number) => {
     const clamped = Math.round(Math.min(480, Math.max(220, px)));

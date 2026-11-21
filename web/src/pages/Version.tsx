@@ -11,6 +11,9 @@ export default function Version() {
   const { user, refreshVersions } = useShared();
   // Kept here, not in the panels: publishing turns the draft panel into the live one.
   const [message, setMessage] = useState("");
+  // The editor's body while it differs from the saved draft. "What changed" and a Test use the saved
+  // draft, so the page says so, and Test saves first.
+  const [unsaved, setUnsaved] = useState<any | null>(null);
   const { data, error, reload } = useLoad(async () => {
     const plain = await api.version(name);
     return plain.parent ? api.version(name, plain.parent) : plain;
@@ -35,9 +38,14 @@ export default function Version() {
       {isDraft && user.role !== "viewer" && <Discard name={data.name} labels={data.test_labels ?? 0} notify={setMessage} />}
       {message && <p className="message" role="status">{message}</p>}
       {isDraft ? <DraftGuide policy={data} /> : <PublishedNote policy={data} notify={setMessage} onChange={refresh} />}
+      {isDraft && unsaved && (
+        <p className="message warn" role="status" data-testid="unsaved">
+          You have unsaved changes below. "What changed" and a Test use the saved draft: Save, or Save and test, to include them.
+        </p>
+      )}
       {data.diff && <Changes policy={data} />}
-      {isDraft && <DraftTools policy={data} onChange={refresh} notify={setMessage} />}
-      {isDraft && user.role !== "viewer" ? <Editor policy={data} onSaved={refresh} notify={setMessage} /> : <PolicyText policy={data} />}
+      {isDraft && <DraftTools policy={data} unsaved={unsaved} onChange={refresh} notify={setMessage} />}
+      {isDraft && user.role !== "viewer" ? <Editor policy={data} onSaved={refresh} onEdit={setUnsaved} notify={setMessage} /> : <PolicyText policy={data} />}
     </div>
   );
 }
@@ -144,7 +152,7 @@ function describe(where: string, policy: Policy): string {
   const [code, field] = where.split(".");
   const title = policy.body.sections.find((s: any) => s.code === code)?.title ?? "";
   const fields: Record<string, string> = { text: "text", effect: "effect", screen: "Jev's question", examples: "examples", title: "title", red_flags: "red flags" };
-  return `${code} ${title}${field ? `: ${fields[field] ?? field}` : ""}`;
+  return `${code}${title ? ` ${title}` : ""}${field ? `: ${fields[field] ?? field}` : ""}`; // a removed section has no title here
 }
 
 function Changes({ policy }: { policy: Policy }) {
@@ -171,7 +179,7 @@ const TEST_SIZES = [25, 50, 100, 200];
 
 // Test, Submit and Publish, each shown to the roles that may use it, with the reason when it can't
 // be used yet. The API checks every rule again.
-function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: () => void; notify: (m: string) => void }) {
+function DraftTools({ policy, unsaved, onChange, notify }: { policy: Policy; unsaved: any | null; onChange: () => void; notify: (m: string) => void }) {
   const { user } = useShared();
   const [report, setReport] = useState<Report | null>(null);
   const [polls, setPolls] = useState(0);
@@ -215,20 +223,22 @@ function DraftTools({ policy, onChange, notify }: { policy: Policy; onChange: ()
           </label>
           {running ? (
             <button onClick={() => act(() => api.stopTest(policy.name), "Test stopped. It stands on the postings labeled so far.")}>Stop the test</button>
+          ) : unsaved ? (
+            <button onClick={() => act(() => api.saveDraft(policy.name, unsaved).then(() => api.startTest(policy.name, size)), `Saved, and the Test started on up to ${size} recent postings.`)}>Save and test</button>
           ) : (
             <button onClick={() => act(() => api.startTest(policy.name, size), `Test started on up to ${size} recent postings.`)}>Test this draft</button>
           )}
           {user.role === "editor" && (
             <button
               className="primary"
-              disabled={!passed || !!policy.submitted_by}
+              disabled={!passed || !!policy.submitted_by || !!unsaved}
               onClick={() => act(() => api.submit(policy.name), "Submitted. A publisher needs to publish it.")}
             >
               {policy.submitted_by ? "Submitted" : "Submit for publishing"}
             </button>
           )}
           {user.role === "publisher" && (
-            <button className="primary" disabled={!!publishBlocked} title={publishBlocked}
+            <button className="primary" disabled={!!publishBlocked || !!unsaved} title={publishBlocked}
               onClick={() => act(() => api.publish(policy.name), "Published. Recent postings the Test didn't cover are being labeled again.")}>
               Publish
             </button>
@@ -279,7 +289,7 @@ function FlipReport({ report }: { report: Report }) {
           <tbody>
             {report.flips.map((f) => (
               <tr key={f.label_id}>
-                <td><Link className="mono" to={`/labels/${f.label_id}`}>{f.job_id}</Link></td>
+                <td><Link className="mono" to={`/labels/${f.live_label_id ?? f.label_id}`}>{f.job_id}</Link></td>
                 <td><LabelBadge label={f.before.label} /> {f.before.sections.map((s) => <SectionTag key={s} code={s} />)}</td>
                 <td><LabelBadge label={f.after.label} /> {f.after.sections.map((s) => <SectionTag key={s} code={s} />)}</td>
               </tr>
@@ -369,12 +379,13 @@ function AutoText({ value, onChange, label, minRows = 2 }: { value: string; onCh
 }
 
 // The draft as a form, one block per section, so editing can't produce broken YAML.
-function Editor({ policy, onSaved, notify }: { policy: Policy; onSaved: () => void; notify: (m: string) => void }) {
+function Editor({ policy, onSaved, onEdit, notify }: { policy: Policy; onSaved: () => void; onEdit: (body: any | null) => void; notify: (m: string) => void }) {
   const [body, setBody] = useState(() => structuredClone(policy.body));
   const { user } = useShared();
   const { open, toggleAll, toggleOne } = useOpenAll(body.sections.length);
   const [removing, setRemoving] = useState<number | null>(null);
   useEffect(() => setBody(structuredClone(policy.body)), [policy]);
+  useEffect(() => onEdit(JSON.stringify(body) === JSON.stringify(policy.body) ? null : body), [body, policy, onEdit]);
 
   const setSection = (i: number, update: (s: any) => void) =>
     setBody((b: any) => { const next = structuredClone(b); update(next.sections[i]); return next; });

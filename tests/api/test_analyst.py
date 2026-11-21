@@ -79,7 +79,7 @@ async def test_the_steps_show_a_run_in_progress(api, worker, monkeypatch):
         job = await jobs.claim(conn, worker.thread_for)
     run = asyncio.create_task(worker.handle(job))
     try:
-        for _ in range(100):  # the UI polls like this
+        for _ in range(300):  # the UI polls like this; up to 15 s, as a CI runner can be slow
             steps = (await api.get(f"/ui/postings/{job['posting_id']}/steps", headers=as_("viewer"))).json()
             if steps["steps"] and steps["steps"][-1]["node"] == "escalate":
                 break

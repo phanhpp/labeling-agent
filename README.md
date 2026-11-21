@@ -52,8 +52,8 @@ open http://localhost:8000
 
 ```
 cp .env.example .env     # then add ANTHROPIC_API_KEY; TYPESAFE_API_KEY is optional (without it, Claude Haiku screens instead of Jev)
-make demo                # an empty database, 100 real postings labeled, v2 published, v3 as a draft (about $0.75)
-open http://localhost:8000
+make demo                # an empty database, 100 real postings labeled, v2 published, v3 as a draft (about 2 minutes, $0.75)
+open http://localhost:8000   # once make demo prints "Ready"
 ```
 
 **What you see after `make demo`:**

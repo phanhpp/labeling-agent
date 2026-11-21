@@ -14,6 +14,7 @@ demo:          ## a fresh stack: 100 real development postings labeled by Claude
 	uv run python -m scripts.submit_postings --split dev --limit 100 --dataset-labels
 	uv run python -m scripts.demo_draft --publish
 	uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml
+	@echo "Ready: open http://localhost:8000"
 
 demo-draft:    ## load policy v3 (narrows §5) as an untested draft, to Test and publish in the UI
 	uv run python -m scripts.demo_draft --name v3 --file policies/v3.yaml

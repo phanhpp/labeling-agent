@@ -83,9 +83,11 @@ Next, [The analyst UI](#the-analyst-ui) says where things are and [Things to try
 
 **Who can do what** (switch under "You are" in the Workspace):
 
-- **Everyone, including Vic (viewer):** browse and open postings, view any version's labels, compare versions, compare with the dataset's label.
-- **Eddie (editor):** also sends live-demo postings, records decisions, and creates, edits, Tests, Submits and discards drafts.
-- **Pat and Sam (publishers):** also Publish a draft and make an older version live again. Whoever edited a draft can't publish it, so a second person always checks.
+- **Viewer (Vic):** read, compare.
+- **Editor (Eddie):** read, compare, send postings, decide, edit drafts, Test, Submit.
+- **Publisher (Pat, Sam):** read, compare, send postings, decide, edit drafts, Test, Publish, roll back. Whoever edited a draft can't publish it, so a second person always checks.
+
+Read means browse and open postings and view any version's labels. Compare means two versions side by side, or our labels against the dataset's. Send postings is the live demo. Decide is an analyst's final decision on a posting. Roll back makes an older version live again.
 
 "Showing policy" only changes which labels you look at. Only a publisher can change which version is live.
 

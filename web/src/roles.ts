@@ -5,10 +5,10 @@
 export type User = { key: string; name: string; role: "viewer" | "editor" | "publisher"; token: string; can: string };
 
 export const USERS: User[] = [
-  { key: "viewer", name: "Vic", role: "viewer", token: "demo-viewer", can: "can read" },
-  { key: "editor", name: "Eddie", role: "editor", token: "demo-editor", can: "can decide and edit drafts" },
-  { key: "publisher_a", name: "Pat", role: "publisher", token: "demo-publisher-a", can: "can also publish" },
-  { key: "publisher_b", name: "Sam", role: "publisher", token: "demo-publisher-b", can: "can also publish" },
+  { key: "viewer", name: "Vic", role: "viewer", token: "demo-viewer", can: "read, compare" },
+  { key: "editor", name: "Eddie", role: "editor", token: "demo-editor", can: "read, compare, send postings, decide, edit drafts, Test, Submit" },
+  { key: "publisher_a", name: "Pat", role: "publisher", token: "demo-publisher-a", can: "read, compare, send postings, decide, edit drafts, Test, Publish, roll back" },
+  { key: "publisher_b", name: "Sam", role: "publisher", token: "demo-publisher-b", can: "read, compare, send postings, decide, edit drafts, Test, Publish, roll back" },
 ];
 
 const STORE = "acting-as";

@@ -11,10 +11,14 @@
 
 name: CI
 
+# A change to the written docs alone runs nothing. RESULTS.md is not on the list: it is generated
+# from the eval runs, and a test checks that the two still match.
 on:
   pull_request:
+    paths-ignore: [README.md, DESIGN.md, AGENTS.md, CLAUDE.md]
   push:
     branches: [main]
+    paths-ignore: [README.md, DESIGN.md, AGENTS.md, CLAUDE.md]
 
 # The token can only read the repository: no step here pushes, comments or edits anything.
 permissions:

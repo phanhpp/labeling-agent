@@ -32,7 +32,7 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 
 **4. Evaluation.** Precision, recall and F1 for the fraud class, a confusion matrix with NEEDS_REVIEW as its own column, cost per 1,000 postings and p50/p95 latency, all on the 400 fixed test postings. NEEDS_REVIEW is counted both ways and the choice is explained. 9 errors are analysed, and a load test checks the 60-second target. The code is in `eval/`; the numbers are in [RESULTS.md](RESULTS.md).
 
-**5. Policy change demo.** Policy v2 adds a section (§6); `make demo` Tests and publishes it through the API, so the app starts with v1 and v2 to compare, and v3 waits as a draft to publish from the UI, with no code change; [The live demo](#the-live-demo) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
+**5. Policy change demo.** Policy v2 adds a section (§6); `make demo` Tests and publishes it through the API, so the app starts with v1 and v2 to compare, and v3 waits as a draft to publish from the UI, with no code change; [Things to try](#things-to-try) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
 
 **One command to start:** `make demo`, or `docker compose up`. Keys are read from the environment, with a `.env.example`, and there are no secrets in the repo.
 
@@ -55,6 +55,14 @@ cp .env.example .env     # then add ANTHROPIC_API_KEY; TYPESAFE_API_KEY is optio
 make demo                # an empty database, 100 real postings labeled, v2 published, v3 as a draft (about $0.75)
 open http://localhost:8000
 ```
+
+**What you see after `make demo`:**
+
+- 100 real postings from the development set, labeled by Claude under policy v1 and again under v2.
+- Policy v2 (adds §6) live, v1 kept as the previous version, and v3 (narrows §5) waiting as a draft.
+- You start as Vic, a viewer, who can only read. Switch to Eddie (editor) or Sam (publisher) under "You are" in the Workspace panel on the right.
+
+[The analyst UI](#the-analyst-ui) says where things are; [Things to try](#things-to-try) walks through the demo.
 
 `make down` stops everything and keeps the data; `make reset` deletes the local database so the next start is empty. Without keys, `make up` still starts: postings wait in the queue and the page says labeling is off.
 
@@ -167,23 +175,32 @@ It answers per section, for example: §1 matched, quote "buy the starter kit".
 
 ## The analyst UI
 
-- **Labels list:** each posting's label, a highlighted evidence quote, the policy sections it matched (click one for its quotes and reasoning) and the reason. Filter by label, section or job id; page through; the filters stay in the address.
-- **A posting:** the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here.
+**Where things are:**
+
+- **Top bar:** Labels (the list), Versions (the policies), and "Showing policy", the version whose labels you are looking at. Click it to pick another.
+- **Left:** filters for the list, by job id, label or policy section. It folds away, and you can drag it wider.
+- **Middle, the Labels list:** each posting's label, a highlighted evidence quote, the policy sections it matched (click one for its quotes and reasoning) and the reason. Page through; the filters stay in the address. The switch "Compare with the dataset's label" adds the dataset's own answer.
+- **Right, the Workspace** (every page): "You are" (the role), "Policy shown", "How labels changed" (compare two versions) and "Live demo: send real postings". The last two start folded.
+
+**The other pages:**
+
+- **A posting** (click a row): the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here.
 - **Versions:** edit a draft (add or remove sections, change wording, examples and Jev's question), Test it on as many recent postings as you choose, read the flip report, Submit, Publish, roll back.
 - **Compare:** any two versions side by side, with only the postings that changed.
-- **Workspace panel** (every page): switch role (viewer, editor, two publishers) and the policy version shown, compare the latest with the previous, follow a re-label, and in demo mode send real postings and compare our labels with the dataset's.
 
+**The roles:** Vic (viewer) reads. Eddie (editor) edits drafts, Tests and Submits them, records decisions and sends live-demo postings. Pat and Sam (publishers) can also Publish and make an older version live again; whoever edited a draft can't publish it, so a second person always checks.
 
-
-### The live demo
+### Things to try
 
 After `make demo`, at [http://localhost:8000](http://localhost:8000):
 
-1. **New postings arrive:** as Eddie (editor), open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
-2. **Check against the dataset:** switch on "Compare with the dataset's label" to see the dataset's own answer next to ours. The agent never sees it.
-3. **See a published change:** the app starts with v2 live (adds §6) and v1 kept as the previous version. "How labels changed" in the Workspace compares v1 → v2.
-4. **Change the policy yourself:** open Versions, then draft v3 (narrows §5). As Eddie, Test it and Submit; as Sam (publisher), Publish. When the re-label is done, "How labels changed" v2 → v3 shows the difference. As Pat or Sam, "Make v2 live again" rolls back.
-5. **New postings follow the new policy:** send a few more; they are labeled under the live version at once.
+1. **Read a decision (any role):** filter "Needs review" and open a posting: the highlighted evidence, what the agent found, the checks and the steps.
+2. **Send new postings (Eddie):** open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
+3. **Compare with the dataset's label:** switch it on to see the dataset's answer next to ours, and which fraud was missed or legitimate posting wrongly flagged. The agent never sees it.
+4. **Compare versions:** "Showing policy" switches the list between v1's and v2's labels, without changing what is live. "How labels changed" in the Workspace shows v1 → v2: only the postings that changed, and why.
+5. **Change the policy (Eddie, then Sam):** open Versions, then draft v3 (narrows §5). As Eddie, Test it (the agent runs again on the 100 postings under v3: about $0.40 and a minute), read which labels would flip, and Submit. As Sam, Publish: the Test's labels are kept, so nothing runs again. "How labels changed" now shows v2 → v3.
+6. **Switch what is live (Pat or Sam):** open v2 in Versions and click "Make v2 live again". Its labels are already there, so the switch is instant.
+7. **New postings follow the live policy:** send a few more; they are labeled under it at once.
 
 
 
@@ -212,7 +229,7 @@ After `make demo`, at [http://localhost:8000](http://localhost:8000):
 
 Testing happens at three levels.
 
-- **The code.** 269 Python tests cover the API, the agent's steps, the queue, policy versions and the data split. The models are faked, so the tests are fast and free. 25 UI unit tests and 17 browser tests click through the real app: browsing, opening a posting, roles, Test and Publish, the live demo. All of them run on every pull request.
+- **The code.** 269 Python tests cover the API, the agent's steps, the queue, policy versions and the data split. The models are faked, so the tests are fast and free. 25 UI unit tests and 18 browser tests click through the real app: browsing, opening a posting, roles, Test and Publish, the live demo. All of them run on every pull request.
 - **The quality.** The 400 test postings the assignment fixes measure how good the agent is overall. They are never used for tuning, and the agent ran on them once per policy. The full results are in RESULTS.md.
 - **A safety net in CI.** 19 short hand-written postings, each with a known right answer, run with real models whenever a pull request changes the agent, a prompt or the policy. They cover the policy's tricky edges (a commission-only job with the pay stated plainly must be ALLOWED), prompt injections (each must be held for review), and policy changes (each case states the right answer under every version). If any case gets the wrong answer, the check fails, so the mistake is caught before the change goes in. The cases are in `eval/suites/`.
 - **The load.** The brief asks for 95% of postings labeled within 60 seconds at five times normal traffic, which is 11.6 postings a second. Real postings went through the real API, queue and workers in two tests: that rate held for 30 seconds (348 postings), and a burst of 200 sent in one request, like a marketplace sending a backlog. With one worker running 16 jobs at once, both met the target, but at the peak the queue was growing. With three workers (48 jobs at once), the slowest 5% took about 6 seconds at the peak and 15 seconds in the burst. Adding workers this way is how we mimic Part A's autoscaling design.

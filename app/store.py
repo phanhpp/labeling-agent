@@ -342,7 +342,6 @@ async def read_label(conn: AsyncConnection, client_id: str, job_id: str) -> dict
         out |= {
             "label": decision["label"],
             "decided_by": "analyst",
-            "analyst_note": decision["note"],
             "decided_at": decision["created_at"].isoformat(),
             "model_label": label["label"] if label else None,
         }
@@ -380,14 +379,14 @@ def output_of(label: dict) -> dict:
     }
 
 
-async def record_decision(conn, posting_id: int, label: str, note: str, analyst: str) -> dict:
+async def record_decision(conn, posting_id: int, label: str, analyst: str) -> dict:
     live = await live_policy(conn)
     row = await (
         await conn.execute(
-            "INSERT INTO decisions (posting_id, label, note, analyst, policy_version)"
-            " VALUES (%s, %s, %s, %s, %s)"
+            "INSERT INTO decisions (posting_id, label, analyst, policy_version)"
+            " VALUES (%s, %s, %s, %s)"
             " RETURNING *",
-            (posting_id, label, note, analyst, live["name"]),
+            (posting_id, label, analyst, live["name"]),
         )
     ).fetchone()
     return row
@@ -521,7 +520,7 @@ async def label_detail(conn: AsyncConnection, label_id: int) -> dict | None:
     ).fetchall()
     decisions = await (
         await conn.execute(
-            "SELECT label, note, analyst, policy_version, created_at FROM decisions WHERE posting_id = %s"
+            "SELECT label, analyst, policy_version, created_at FROM decisions WHERE posting_id = %s"
             " ORDER BY created_at DESC",
             (label["posting_id"],),
         )

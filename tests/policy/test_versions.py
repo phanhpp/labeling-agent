@@ -272,7 +272,7 @@ async def test_rollback_makes_the_old_labels_current_at_once(api, worker):
 async def test_a_new_version_that_disagrees_with_an_analyst_is_flagged(api, worker):
     await labeled(api, worker, POSTING)
     [label] = await sql(api, "SELECT id FROM labels")
-    decision = {"label": "ALLOWED", "note": "Fee is refunded on day one."}
+    decision = {"label": "ALLOWED"}
     await api.post(f"/ui/labels/{label['id']}/decision", json=decision, headers=as_("editor"))
     assert (await label_of(api, "p1"))["new_policy_disagrees"] is False  # decided under the live version
 

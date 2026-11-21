@@ -96,13 +96,13 @@ async def test_the_steps_show_a_run_in_progress(api, worker, monkeypatch):
 
 async def test_an_analyst_decision_is_final_for_reads(api, worker):
     ids = await _labeled(api, worker)
-    decision = {"label": "ALLOWED", "note": "Kit fee is refunded; checked with the employer."}
+    decision = {"label": "ALLOWED"}
     response = await api.post(f"/ui/labels/{ids['p1']}/decision", json=decision, headers=as_("editor"))
     assert response.status_code == 201
     assert response.json()["analyst"] == "eddie"  # who and when are kept
     out = (await api.get("/v1/postings/p1/label", headers=as_("marketplace"))).json()
     assert out["label"] == "ALLOWED" and out["decided_by"] == "analyst"
-    assert out["model_label"] == "VIOLATING" and out["analyst_note"] == decision["note"]
+    assert out["model_label"] == "VIOLATING" and "analyst_note" not in out  # a label only, no free text
 
 
 async def test_after_a_new_version_goes_live_the_old_label_is_returned_as_stale(api, worker):

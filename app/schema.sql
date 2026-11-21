@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS decisions (
     id              bigserial PRIMARY KEY,
     posting_id      bigint NOT NULL REFERENCES postings (id),
     label           text NOT NULL CHECK (label IN ('VIOLATING', 'ALLOWED', 'NEEDS_REVIEW')),
-    note            text NOT NULL DEFAULT '',
+    note            text NOT NULL DEFAULT '',  -- no longer written: a decision is a label only
     analyst         text NOT NULL,
     policy_version  text NOT NULL,                  -- the live version when the analyst decided
     created_at      timestamptz NOT NULL DEFAULT now()

@@ -7,7 +7,7 @@ import { DatasetVerdict } from "../components/Dataset";
 import { segments, spansFor } from "../lib/highlight";
 import { neighbours, readListContext } from "../lib/listContext";
 import { durations, summary } from "../lib/steps";
-import { field, location, modelName, reasonSentence, stepName } from "../lib/words";
+import { field, location, modelName, person, reasonSentence, stepName } from "../lib/words";
 
 const FIELDS: [string, string][] = [
   ["company_profile", "Company profile"],
@@ -145,7 +145,7 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
       )}
       {decision && (
         <div className="final" data-testid="analyst-decision">
-          <b>Analyst decision: {decision.label.replace("_", " ").toLowerCase()}</b> (final) · {decision.analyst}
+          <b>Analyst decision: {decision.label.replace("_", " ").toLowerCase()}</b> (final) · {person(decision.analyst)}
           {decision.note && <div>{decision.note}</div>}
         </div>
       )}

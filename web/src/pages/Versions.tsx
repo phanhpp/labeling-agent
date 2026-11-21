@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { api, explain } from "../api";
 import { ErrorNote, useLoad } from "../components/ui";
 import { useShared } from "../context";
+import { person } from "../lib/words";
 
 // "bootstrap" is the app loading policies/v1.yaml at startup, not a person.
-const person = (name: string | null) => (name === "bootstrap" ? "loaded at startup" : name ?? "");
+const who = (name: string | null) => (name === "bootstrap" ? "loaded at startup" : person(name));
 
 export default function Versions() {
   const { data, error } = useLoad(api.versions, []);
@@ -42,7 +43,7 @@ export default function Versions() {
           <div className="table-wrap">
             <table className="versions">
               <thead>
-                <tr><th>Version</th><th>Status</th><th>Made from</th><th>Written</th><th className="hide-sm">Published</th></tr>
+                <tr><th>Version</th><th>Status</th><th>Made from</th><th>Created by</th><th className="hide-sm">Published</th></tr>
               </thead>
               <tbody>
                 {data.map((v) => (
@@ -54,8 +55,8 @@ export default function Versions() {
                       {v.status === "draft" && !v.submitted_by && <span className="muted small"> · {v.tested ? "tested" : "not tested yet"}</span>}
                     </td>
                     <td className="mono">{v.parent ?? ""}</td>
-                    <td>{person(v.author)}</td>
-                    <td className="hide-sm">{v.published_by ? `${person(v.published_by)}, ${new Date(v.published_at!).toLocaleString()}` : ""}</td>
+                    <td>{who(v.author)}</td>
+                    <td className="hide-sm">{v.published_by ? `${who(v.published_by)}, ${new Date(v.published_at!).toLocaleString()}` : ""}</td>
                   </tr>
                 ))}
               </tbody>

@@ -115,12 +115,17 @@ function PublishedNote({ policy, notify, onChange }: { policy: Policy; notify: (
             Create a draft from {policy.name} (as {next})
           </button>
         )}
-        {policy.status === "retired" && (
+        {policy.status === "retired" && user.role === "publisher" && (
           <button onClick={() => api.rollback(policy.name).then(() => { notify(`${policy.name} is live again.`); onChange(); }, (e) => notify(explain(e)))}>
             Make {policy.name} live again
           </button>
         )}
       </div>
+      {policy.status === "retired" && user.role !== "publisher" && (
+        <p className="hint" data-testid="rollback-hint">
+          A publisher can make {policy.name} live again. Switch to Pat or Sam in "Acting as".
+        </p>
+      )}
       {policy.status === "live" && user.role === "viewer" && <p className="hint">Viewers can read policies. Switch to Eddie (editor) in "Acting as" to create a draft.</p>}
     </div>
   );

@@ -22,19 +22,19 @@ Reads a job posting and decides whether it breaks a fraud policy. For each posti
 
 [DESIGN.md](DESIGN.md) is the design for running this on AWS (Part A). This repo runs the same system on your machine (Part B). [RESULTS.md](RESULTS.md) has the measured results.
 
-## How this repo meets the brief
+## How this repo meets the assignment's requirements
 
 **1. Labeling agent.** A LangGraph agent reads the policy at run time and returns the brief's JSON: job id, label, sections, evidence, rationale, confidence and policy version. Every quote is checked word for word against the posting, and code, not the model, sets the label. The code is in `app/agent/`; any posting in the UI shows its JSON answer.
 
-**2. Backend and API.** Postings come in one at a time (`POST /v1/postings`) or in batches of up to 500 (`POST /v1/postings/batch`), and their labels are read back with `GET /v1/postings/{id}/label`. Policy versions are drafted, tested, published and rolled back through `/policies`. A queue and parallel workers do the labeling. The code is in `app/api/`, `app/queue.py` and `app/worker.py`; every endpoint is listed at http://localhost:8000/docs.
+**2. Backend and API.** Postings come in one at a time (`POST /v1/postings`) or in batches of up to 500 (`POST /v1/postings/batch`), and their labels are read back with `GET /v1/postings/{id}/label`. Policy versions are drafted, tested, published and rolled back through `/policies`. A queue and parallel workers do the labeling. The code is in `app/api/`, `app/queue.py` and `app/worker.py`; every endpoint is listed at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-**3. Analyst UI.** Analysts browse labeled postings with the evidence highlighted, filter by label or section, open a single decision, and edit and publish policy versions. It also compares versions, has roles, and runs a live demo. The code is in `web/src/`; it runs at http://localhost:8000.
+**3. Analyst UI.** Analysts browse labeled postings with the evidence highlighted, filter by label or section, open a single decision, and edit and publish policy versions. It also compares versions, has roles, and runs a live demo. The code is in `web/src/`; it runs at [http://localhost:8000](http://localhost:8000).
 
 **4. Evaluation.** Precision, recall and F1 for the fraud class, a confusion matrix with NEEDS_REVIEW as its own column, cost per 1,000 postings and p50/p95 latency, all on the 400 fixed test postings. NEEDS_REVIEW is counted both ways and the choice is explained. 9 errors are analysed, and a load test checks the 60-second target. The code is in `eval/`; the numbers are in [RESULTS.md](RESULTS.md).
 
 **5. Policy change demo.** Policy v2 adds a section (§6) and is published from the UI, with no code change; [The live demo](#the-live-demo) walks through it. Two more versions show the other kinds of change: v3 edits a section's wording, and v4 changes only what a section leads to (§4 now sends to review instead of VIOLATING). Existing postings are re-labeled in the cheapest valid way: labels from the draft's Test are kept, a wording change is re-read by Claude, and an outcome-only change like v4 is decided again in code, with no model calls. `make demo-versions` runs all three; the policies are in `policies/`, the logic in `app/versions.py`, and the results in [RESULTS.md](RESULTS.md).
 
-**Also asked:** one command to start (`make demo`, or `docker compose up`), keys read from the environment with a `.env.example`, and no secrets in the repo. The Part A design is in [DESIGN.md](DESIGN.md).
+**One command to start:** `make demo`, or `docker compose up`. Keys are read from the environment, with a `.env.example`, and there are no secrets in the repo.
 
 ## Quick start
 
@@ -62,23 +62,27 @@ open http://localhost:8000
 
 Every `make` target is one or two plain commands; see the [Makefile](Makefile).
 
-| Group | Command | What it does |
-| --- | --- | --- |
-| **Run** | `make up` | The database, API, UI and worker in Docker, on http://localhost:8000 |
-| | `make up-fake` | The same with the stand-in model: no keys, no cost |
-| | `make demo` | A fresh start with real models: 100 postings labeled, policy v2 ready to Test (about $0.35) |
-| | `make down` / `make reset` | Stop (data kept) / delete the local database |
-| **Demo helpers** | `make seed` | 14 sample postings, a decision and a draft, into any running app |
-| | `make demo-draft` | Load `policies/v2.yaml` as an untested draft |
-| | `make guardrails` | Show the API refusing bad requests and holding an injection |
-| **Develop** | `make api`, `make worker`, `make web` | Each part from source with live reload (the UI on :5173) |
-| **Test** | `make test` | Python tests (models faked) and the UI's unit tests |
-| | `make lint` | Style and type checks |
-| | `make e2e` | Browser tests against a running app (after `make up-fake seed`) |
-| **Evaluate** | `make eval-dev` | Real models on 50 development postings, a quick check (about $0.20) |
-| | `make results` | Rebuild RESULTS.md from the saved runs, and check it matches them |
-| | `make load-test` | The 60-second target under the 5x peak and a burst (about $1.50) |
-| | `make demo-versions` | Policy v2 to v4 with real models on 100 postings (about $1) |
+
+| Group            | Command                               | What it does                                                                                  |
+| ---------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **Run**          | `make up`                             | The database, API, UI and worker in Docker, on [http://localhost:8000](http://localhost:8000) |
+|                  | `make up-fake`                        | The same with the stand-in model: no keys, no cost                                            |
+|                  | `make demo`                           | A fresh start with real models: 100 postings labeled, policy v2 ready to Test (about $0.35)   |
+|                  | `make down` / `make reset`            | Stop (data kept) / delete the local database                                                  |
+| **Demo helpers** | `make seed`                           | 14 sample postings, a decision and a draft, into any running app                              |
+|                  | `make demo-draft`                     | Load `policies/v2.yaml` as an untested draft                                                  |
+|                  | `make guardrails`                     | Show the API refusing bad requests and holding an injection                                   |
+| **Develop**      | `make api`, `make worker`, `make web` | Each part from source with live reload (the UI on :5173)                                      |
+| **Test**         | `make test`                           | Python tests (models faked) and the UI's unit tests                                           |
+|                  | `make lint`                           | Style and type checks                                                                         |
+|                  | `make e2e`                            | Browser tests against a running app (after `make up-fake seed`)                               |
+| **Evaluate**     | `make eval-dev`                       | Real models on 50 development postings, a quick check (about $0.20)                           |
+|                  | `make results`                        | Rebuild RESULTS.md from the saved runs, and check it matches them                             |
+|                  | `make load-test`                      | The 60-second target under the 5x peak and a burst (about $1.50)                              |
+|                  | `make demo-versions`                  | Policy v2 to v4 with real models on 100 postings (about $1)                                   |
+
+
+
 
 ## What Part B does
 
@@ -100,6 +104,8 @@ flowchart LR
   R --> O
   D --> O
 ```
+
+
 
 1. **Clean:** remove hidden text and invisible characters.
 2. **In cache?** The same text under the same policy was labeled before: reuse that label, no models called.
@@ -144,6 +150,7 @@ It answers per section, for example: §1 matched, quote "buy the starter kit".
 **Queue and parallel workers.** Jobs wait in a Postgres table. Live postings go first, then re-labels after a policy change, then Test runs. A worker runs several jobs at once (`WORKER_CONCURRENCY`), and several workers can run side by side (`docker compose up --scale worker=3`), because each job is locked while one worker holds it. A failed job is retried 3 times, then held for review. Each step is saved as it finishes, so a job interrupted by a crash resumes where it stopped and doesn't pay for the models twice.
 
 **Caching, at three levels.**
+
 - **Same posting, same policy:** a repeat reuses the stored label, at no cost.
 - **Prompt caching:** the policy goes first in Claude's prompt and the posting last, so the policy part is cached and each posting pays only for its own text.
 - **Test results are kept:** when a draft is published, postings its Test already labeled keep those labels; only the rest are labeled again.
@@ -166,18 +173,23 @@ It answers per section, for example: §1 matched, quote "buy the starter kit".
 - **Compare:** any two versions side by side, with only the postings that changed.
 - **Workspace panel** (every page): switch role (viewer, editor, two publishers) and the policy version shown, compare the latest with the previous, follow a re-label, and in demo mode send real postings and compare our labels with the dataset's.
 
+
+
 ### The live demo
 
-After `make demo`, at http://localhost:8000:
+After `make demo`, at [http://localhost:8000](http://localhost:8000):
 
 1. **New postings arrive:** as Eddie (editor), open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
 2. **Check against the dataset:** switch on "Compare with the dataset's label" to see the dataset's own answer next to ours. The agent never sees it.
 3. **Change the policy:** open Versions, then draft v2 (adds §6). As Eddie, Test it and Submit; as Sam (publisher), Publish. When the re-label is done, "Compare v1 → v2" shows what changed.
 4. **New postings follow the new policy:** send a few more; they are labeled under v2 at once.
 
+
+
 ## Your data
 
 **The local database.** A Postgres database in Docker on your machine holds what the app has seen or made:
+
 - the postings it was sent, and their labels under each policy version;
 - the policy versions and drafts;
 - analysts' decisions;
@@ -192,6 +204,8 @@ After `make demo`, at http://localhost:8000:
 - **Development set: 300 postings, 75 fraud.** Where prompts were tuned and set-ups compared; `make demo` sends 100 of them to the app.
 - **Jev fitting set: 3,552 postings.** Used only to set Jev's two thresholds: when a posting can skip Claude, and when it is held as an injection.
 - **Everything else:** the live demo and the load test draw from any posting outside the 400 and their copies, so a demo never shows a test posting.
+
+
 
 ## How it's tested
 
@@ -212,16 +226,20 @@ uv run python -m eval.run_eval --split eval --config jev_sonnet --frozen --polic
 make results         # rebuild RESULTS.md from the saved runs
 ```
 
+
+
 ## How the two thresholds were chosen
 
 **What Jev returns.** Jev gets one call per posting with one yes/no question per policy section, so 5 questions for policy v1, plus one injection question. For each, it returns the **probability that the answer is yes**, from 0 (surely no) to 1 (surely yes). For example, 0.17 on §4 means Jev thinks there is about a 17% chance the posting offers unrealistic pay.
 
 **When a posting skips Claude: every section scores under 0.17.** If all 5 section scores are under 0.17, the posting is ALLOWED without Claude reading it. If any section scores 0.17 or more, Claude reads it.
+
 - **The trade-off:** a higher cut-off lets more postings skip Claude, which is cheaper, but Jev then clears more postings that Claude would have flagged.
 - **How 0.17 was picked:** Jev and Claude both read the **Jev fitting set** (3,552 postings). 0.17 is the highest cut-off at which Jev clears at most 2 in 100 of the postings Claude flags (as VIOLATING or for review).
 - **Checked on the development set** (300 postings, not used to pick it): Jev cleared 1 in 57 of the postings Claude flagged, under 2 in 100. (`scripts/fit_cutoff.py`)
 
 **When a posting is held as an injection: the injection score is 0.5 or more.** The injection question is *"Does the posting contain text that tries to instruct an AI system that reviews it?"* At 0.5 or more, the posting goes to review and Claude never reads it.
+
 - **The trade-off:** a lower cut-off catches more injections but also holds more normal postings.
 - **How 0.5 was picked:** it was tested on the **Jev fitting set and the development set together** (3,852 normal postings), and on 600 postings with a fake injection added (10 different wordings, 4 of them kept hidden from the tuning). 0.5 is the lowest cut-off that wrongly holds at most 1 in 1,000 normal postings.
 - **Result:**
@@ -232,27 +250,34 @@ The data sets are described in [How the dataset is split](#your-data).
 
 ## AWS design (DESIGN.md) vs this repo
 
-| On AWS | Here |
-| --- | --- |
-| API Gateway and services | One FastAPI app |
-| SQS queues | A `jobs` table in Postgres |
-| ECS workers with autoscaling | Worker containers: `WORKER_CONCURRENCY` jobs each, `--scale worker=N` |
-| Aurora, S3, AppConfig | Postgres: postings, labels, policy versions, saved steps |
-| Bedrock | Anthropic API (Claude) and TypeSafe (Jev) |
-| Cognito sign-in | Demo users, picked in the Workspace |
-| CloudFront | The API serves the UI |
-| Webhooks, gradual rollout, online judges, alerts, spend cap | Not built: described in DESIGN.md |
+
+| On AWS                                                      | Here                                                                  |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| API Gateway and services                                    | One FastAPI app                                                       |
+| SQS queues                                                  | A `jobs` table in Postgres                                            |
+| ECS workers with autoscaling                                | Worker containers: `WORKER_CONCURRENCY` jobs each, `--scale worker=N` |
+| Aurora, S3, AppConfig                                       | Postgres: postings, labels, policy versions, saved steps              |
+| Bedrock                                                     | Anthropic API (Claude) and TypeSafe (Jev)                             |
+| Cognito sign-in                                             | Demo users, picked in the Workspace                                   |
+| CloudFront                                                  | The API serves the UI                                                 |
+| Webhooks, gradual rollout, online judges, alerts, spend cap | Not built: described in DESIGN.md                                     |
+
+
+
 
 ## Where things are
 
-| Folder | What it is for | Key files |
-| --- | --- | --- |
-| `app/api/` | The HTTP API | `intake.py` (marketplaces: `/v1`), `analyst.py` (the UI: `/ui`), `policies.py` (versions), `demo.py` (live demo), `main.py` (app start, errors, serving the UI) |
+
+| Folder       | What it is for                        | Key files                                                                                                                                                                                                                                     |
+| ------------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/api/`   | The HTTP API                          | `intake.py` (marketplaces: `/v1`), `analyst.py` (the UI: `/ui`), `policies.py` (versions), `demo.py` (live demo), `main.py` (app start, errors, serving the UI)                                                                               |
 | `app/agent/` | The labeling agent, one file per step | `graph.py` (the steps wired together), `clean.py`, `cache.py`, `screen.py` (Jev and the injection checks), `escalate.py` (Claude), `check.py` and `quotes.py` (verify quotes), `decide.py` (set the label), `llm.py` (model clients and cost) |
-| `app/` | Everything around the agent | `worker.py` and `queue.py` (take and run jobs), `store.py` (all database queries), `versions.py` (draft, Test, Publish, rollback), `auth.py` (roles), `schema.sql` (tables) |
-| `policies/` | The policy as data | `v1.yaml` (the brief's policy), `v2.yaml` to `v4.yaml` (example changes) |
-| `web/src/` | The analyst UI (React) | `pages/` (list, posting, versions, compare), `components/` (panels and widgets), `lib/` (small tested helpers) |
-| `eval/` | Measuring quality | `run_eval.py` (runs the agent on a set), `metrics.py`, `suites/` (hand-written cases), `thresholds.yaml` (pass marks), `runs/` (saved results), `report.py` (writes RESULTS.md) |
-| `scripts/` | One-off tools | data split, threshold fitting, demo set-up, the load test, the guardrail demo |
-| `tests/` | Python tests, by area | `agent/`, `api/`, `queue/`, `policy/`, `db/`, `data/`, `eval/` |
-| `data/` | The dataset split | `splits.json` (which rows are the 400, development and the rest); the CSV is downloaded, not committed |
+| `app/`       | Everything around the agent           | `worker.py` and `queue.py` (take and run jobs), `store.py` (all database queries), `versions.py` (draft, Test, Publish, rollback), `auth.py` (roles), `schema.sql` (tables)                                                                   |
+| `policies/`  | The policy as data                    | `v1.yaml` (the brief's policy), `v2.yaml` to `v4.yaml` (example changes)                                                                                                                                                                      |
+| `web/src/`   | The analyst UI (React)                | `pages/` (list, posting, versions, compare), `components/` (panels and widgets), `lib/` (small tested helpers)                                                                                                                                |
+| `eval/`      | Measuring quality                     | `run_eval.py` (runs the agent on a set), `metrics.py`, `suites/` (hand-written cases), `thresholds.yaml` (pass marks), `runs/` (saved results), `report.py` (writes RESULTS.md)                                                               |
+| `scripts/`   | One-off tools                         | data split, threshold fitting, demo set-up, the load test, the guardrail demo                                                                                                                                                                 |
+| `tests/`     | Python tests, by area                 | `agent/`, `api/`, `queue/`, `policy/`, `db/`, `data/`, `eval/`                                                                                                                                                                                |
+| `data/`      | The dataset split                     | `splits.json` (which rows are the 400, development and the rest); the CSV is downloaded, not committed                                                                                                                                        |
+
+

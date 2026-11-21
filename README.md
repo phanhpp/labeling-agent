@@ -62,9 +62,38 @@ open http://localhost:8000
 - Policy v2 (adds §6) live, v1 kept as the previous version, and v3 (narrows §5) waiting as a draft.
 - You start as Vic, a viewer, who can only read. Switch to Eddie (editor) or Sam (publisher) under "You are" in the Workspace panel on the right.
 
-[The analyst UI](#the-analyst-ui) says where things are; [Things to try](#things-to-try) walks through the demo.
+Next, [The analyst UI](#the-analyst-ui) says where things are and [Things to try](#things-to-try) walks through the demo.
 
 `make down` stops everything and keeps the data; `make reset` deletes the local database so the next start is empty. Without keys, `make up` still starts: postings wait in the queue and the page says labeling is off.
+
+## The analyst UI
+
+**Where things are:**
+
+- **Top bar:** Labels (the list), Versions (the policies), and "Showing policy", the version whose labels you are looking at. Click it to pick another.
+- **Left:** filters for the list, by job id, label or policy section. It folds away, and you can drag it wider.
+- **Middle, the Labels list:** each posting's label, a highlighted evidence quote, the policy sections it matched (click one for its quotes and reasoning) and the reason. Page through; the filters stay in the address. The switch "Compare with the dataset's label" adds the dataset's own answer.
+- **Right, the Workspace** (every page): "You are" (the role), "Policy shown", "How labels changed" (compare two versions) and "Live demo: send real postings". The last two start folded.
+
+**The other pages:**
+
+- **A posting** (click a row): the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here.
+- **Versions:** edit a draft (add or remove sections, change wording, examples and Jev's question), Test it on as many recent postings as you choose, read the flip report, Submit, Publish, roll back.
+- **Compare:** any two versions side by side, with only the postings that changed.
+
+**The roles:** Vic (viewer) reads. Eddie (editor) edits drafts, Tests and Submits them, records decisions and sends live-demo postings. Pat and Sam (publishers) can also Publish and make an older version live again; whoever edited a draft can't publish it, so a second person always checks.
+
+### Things to try
+
+After `make demo`, at [http://localhost:8000](http://localhost:8000):
+
+1. **Read a decision (any role):** filter "Needs review" and open a posting: the highlighted evidence, what the agent found, the checks and the steps.
+2. **Send new postings (Eddie):** open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
+3. **Compare with the dataset's label:** switch it on to see the dataset's answer next to ours, and which fraud was missed or legitimate posting wrongly flagged. The agent never sees it.
+4. **Compare versions:** "Showing policy" switches the list between v1's and v2's labels, without changing what is live. "How labels changed" in the Workspace shows v1 → v2: only the postings that changed, and why.
+5. **Change the policy (Eddie, then Sam):** open Versions, then draft v3 (narrows §5). As Eddie, Test it (the agent runs again on the 100 postings under v3: about $0.40 and a minute), read which labels would flip, and Submit. As Sam, Publish: the Test's labels are kept, so nothing runs again. "How labels changed" now shows v2 → v3.
+6. **Switch what is live (Pat or Sam):** open v2 in Versions and click "Make v2 live again". Its labels are already there, so the switch is instant.
+7. **New postings follow the live policy:** send a few more; they are labeled under it at once.
 
 ## Commands
 
@@ -90,8 +119,6 @@ Every `make` target is one or two plain commands; see the [Makefile](Makefile).
 |                  | `make demo-versions`                  | Policy v2 to v4 with real models on 100 postings (about $1)                                   |
 
 
-
-
 ## What Part B does
 
 **How a posting is labeled.** The API saves each posting and queues a job; a worker runs these steps:
@@ -112,8 +139,6 @@ flowchart LR
   R --> O
   D --> O
 ```
-
-
 
 1. **Clean:** remove hidden text and invisible characters.
 2. **In cache?** The same text under the same policy was labeled before: reuse that label, no models called.
@@ -173,37 +198,6 @@ It answers per section, for example: §1 matched, quote "buy the starter kit".
 
 **Safety.** Injection phrases are checked before any model reads the posting, and a high Jev injection score holds it before Claude does. Quotes are verified word for word. Every endpoint checks the caller's role, and each marketplace sees only its own postings. Request size and rate are capped, and logs never contain posting text. Known gap: an injection worded unlike anything tested could slip past both checks and reach Claude, which has no tools and can't set the label.
 
-## The analyst UI
-
-**Where things are:**
-
-- **Top bar:** Labels (the list), Versions (the policies), and "Showing policy", the version whose labels you are looking at. Click it to pick another.
-- **Left:** filters for the list, by job id, label or policy section. It folds away, and you can drag it wider.
-- **Middle, the Labels list:** each posting's label, a highlighted evidence quote, the policy sections it matched (click one for its quotes and reasoning) and the reason. Page through; the filters stay in the address. The switch "Compare with the dataset's label" adds the dataset's own answer.
-- **Right, the Workspace** (every page): "You are" (the role), "Policy shown", "How labels changed" (compare two versions) and "Live demo: send real postings". The last two start folded.
-
-**The other pages:**
-
-- **A posting** (click a row): the posting with evidence highlighted in each section's colour; what the agent found per section; the checks it passed; each step of the run; the label under each policy version; the exact JSON the marketplace gets. Editors record a final decision here.
-- **Versions:** edit a draft (add or remove sections, change wording, examples and Jev's question), Test it on as many recent postings as you choose, read the flip report, Submit, Publish, roll back.
-- **Compare:** any two versions side by side, with only the postings that changed.
-
-**The roles:** Vic (viewer) reads. Eddie (editor) edits drafts, Tests and Submits them, records decisions and sends live-demo postings. Pat and Sam (publishers) can also Publish and make an older version live again; whoever edited a draft can't publish it, so a second person always checks.
-
-### Things to try
-
-After `make demo`, at [http://localhost:8000](http://localhost:8000):
-
-1. **Read a decision (any role):** filter "Needs review" and open a posting: the highlighted evidence, what the agent found, the checks and the steps.
-2. **Send new postings (Eddie):** open "Live demo" in the Workspace and send 10 to 100 real postings, at the real mix (about 5% fraud) or 25% fraud. They are never the 400 kept for the eval, nor one already sent. Watch them get labeled; "Show this run in the list" filters to them.
-3. **Compare with the dataset's label:** switch it on to see the dataset's answer next to ours, and which fraud was missed or legitimate posting wrongly flagged. The agent never sees it.
-4. **Compare versions:** "Showing policy" switches the list between v1's and v2's labels, without changing what is live. "How labels changed" in the Workspace shows v1 → v2: only the postings that changed, and why.
-5. **Change the policy (Eddie, then Sam):** open Versions, then draft v3 (narrows §5). As Eddie, Test it (the agent runs again on the 100 postings under v3: about $0.40 and a minute), read which labels would flip, and Submit. As Sam, Publish: the Test's labels are kept, so nothing runs again. "How labels changed" now shows v2 → v3.
-6. **Switch what is live (Pat or Sam):** open v2 in Versions and click "Make v2 live again". Its labels are already there, so the switch is instant.
-7. **New postings follow the live policy:** send a few more; they are labeled under it at once.
-
-
-
 ## Your data
 
 **The local database.** A Postgres database in Docker on your machine holds what the app has seen or made:
@@ -223,8 +217,6 @@ After `make demo`, at [http://localhost:8000](http://localhost:8000):
 - **Jev fitting set: 3,552 postings.** Used only to set Jev's two thresholds: when a posting can skip Claude, and when it is held as an injection.
 - **Everything else:** the live demo and the load test draw from any posting outside the 400 and their copies, so a demo never shows a test posting.
 
-
-
 ## How it's tested
 
 Testing happens at three levels.
@@ -243,8 +235,6 @@ make eval-dev        # 50 development postings, a quick check (about $0.20)
 uv run python -m eval.run_eval --split eval --config jev_sonnet --frozen --policy v1   # the 400 (about $1.35)
 make results         # rebuild RESULTS.md from the saved runs
 ```
-
-
 
 ## How the two thresholds were chosen
 
@@ -279,8 +269,6 @@ The data sets are described in [How the dataset is split](#your-data).
 | Cognito sign-in                                             | Demo users, picked in the Workspace                                   |
 | CloudFront                                                  | The API serves the UI                                                 |
 | Webhooks, gradual rollout, online judges, alerts, spend cap | Not built: described in DESIGN.md                                     |
-
-
 
 
 ## Where things are

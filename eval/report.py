@@ -105,6 +105,16 @@ def build() -> str:
     missed = [r for r in v1 if r["gold"] == 1 and not flagged(r)]
     v2_catches = sum(flagged(by_v2[r["job_id"]]) for r in missed)
     v2_new_alarms = sum(1 for r in v1 if r["gold"] == 0 and not flagged(r) and flagged(by_v2[r["job_id"]]))
+    # the other way: flagged under v1, not under v2 (so the net change is smaller than the new ones)
+    v2_lost = {
+        g: sum(1 for r in v1 if r["gold"] == g and flagged(r) and not flagged(by_v2[r["job_id"]]))
+        for g in (0, 1)
+    }
+    n_flagged = {
+        (name, g): sum(1 for r in rows if r["gold"] == g and flagged(r))
+        for name, rows in (("v1", v1), ("v2", v2))
+        for g in (0, 1)
+    }
     cleared_rows = [r for r in v1 if "cleared_by_screen" in r["reason_codes"]]
     cleared = len(cleared_rows)
     read_rows_ = [
@@ -406,9 +416,11 @@ def build() -> str:
     )
     w(
         "2. **Changing the policy catches some.** v2 adds §6, for a company's text copied with no profile or logo of "
-        f"its own. It catches {v2_catches} of the {len(missed)}, at the cost of {v2_new_alarms} more legitimate postings "
-        "sent to review. (It caught more on the development postings, but §6 was written from those, so this test set "
-        "is the fair measure.)"
+        f"its own. It newly catches {v2_catches} of the {len(missed)}, but stops flagging {v2_lost[1]} other, "
+        f"so {v2_catches - v2_lost[1]} more fraud postings are flagged in all ({n_flagged['v1', 1]} to "
+        f"{n_flagged['v2', 1]}). The cost: {v2_new_alarms} legitimate postings newly flagged and {v2_lost[0]} no longer, "
+        f"so {v2_new_alarms - v2_lost[0]} more in all ({n_flagged['v1', 0]} to {n_flagged['v2', 0]}). (It caught more "
+        "on the development postings, but §6 was written from those, so this test set is the fair measure.)"
     )
     w(
         f"3. **The real signal is the employer.** {history['missed_known']} of the {len(missed)} share their company "

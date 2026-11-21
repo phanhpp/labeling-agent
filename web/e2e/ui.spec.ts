@@ -273,12 +273,18 @@ test("unsaved draft edits: the page says so, and Test saves them first", async (
   await expect(page.getByText("Draft v3 discarded.")).toBeVisible();
 });
 
-test("every visit starts on the live version", async ({ page }) => {
+test("every visit starts on the live version, and a new tab as Vic", async ({ page }) => {
   await page.goto("/");
+  await actAs(page, "editor");
   await page.getByLabel("Policy shown").selectOption("v1");
-  await expect(page.locator(".topbar, header").first()).toContainText("live is v2");
+  await expect(page.locator("header").first()).toContainText("live is v2");
   await page.reload();
   await expect(page.getByLabel("Policy shown")).toHaveValue("v2");
+  await expect(page.getByLabel("Acting as")).toHaveValue("editor"); // a reload keeps the role
+  const fresh = await page.context().newPage();
+  await fresh.goto("/");
+  await expect(fresh.getByLabel("Acting as")).toHaveValue("viewer"); // a new tab starts as Vic
+  await fresh.close();
 });
 
 test("only a publisher can make an older version live again", async ({ page }) => {

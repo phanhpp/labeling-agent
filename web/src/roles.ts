@@ -11,11 +11,13 @@ export const USERS: User[] = [
   { key: "publisher_b", name: "Sam", role: "publisher", token: "demo-publisher-b", can: "read, compare, send postings, decide, edit drafts, Test, Publish, roll back" },
 ];
 
+// Kept for this browser tab only: a reload keeps the role, a new tab starts as Vic, the viewer (so a
+// fresh app at the same address never opens as someone picked in another app).
 const STORE = "acting-as";
 
 export function savedUser(): User {
   try {
-    return USERS.find((u) => u.key === localStorage.getItem(STORE)) ?? USERS[0];
+    return USERS.find((u) => u.key === sessionStorage.getItem(STORE)) ?? USERS[0];
   } catch {
     return USERS[0]; // storage can be blocked; the viewer is the safe default
   }
@@ -23,7 +25,7 @@ export function savedUser(): User {
 
 export function saveUser(user: User): void {
   try {
-    localStorage.setItem(STORE, user.key);
+    sessionStorage.setItem(STORE, user.key);
   } catch {
     /* only a convenience */
   }

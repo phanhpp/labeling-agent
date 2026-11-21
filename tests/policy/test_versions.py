@@ -117,6 +117,11 @@ async def test_a_full_test_runs_in_shadow_and_reports_the_flips(api, worker):
     assert flip["job_id"] == "p3"
     assert flip["before"]["sections"] == ["§5"] and flip["after"]["sections"] == ["§5", "§6"]
     assert flip["from_the_change"] is True and report["flips_from_the_change"] == 1
+    # the report links to the label people see now, not the draft's preview
+    [live] = await sql(
+        api, "SELECT id FROM labels WHERE policy_version = 'v1' AND posting_id = %s", (flip["posting_id"],)
+    )
+    assert flip["live_label_id"] == live["id"] != flip["label_id"]
     assert {i["name"] for i in report["invariants"]} >= {
         "finished",
         "evidence_is_verbatim",

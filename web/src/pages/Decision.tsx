@@ -121,8 +121,10 @@ function Posting({ label }: { label: Detail }) {
 }
 
 function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void }) {
-  const { user, sections, compareDataset } = useShared();
+  const { user, sections, compareDataset, versions, live } = useShared();
   const decision = label.decisions[0];
+  // A draft's Test label is a preview: decisions are only recorded against a published version's label.
+  const isDraftLabel = versions.find((v) => v.name === label.policy_version)?.status === "draft";
   const why = shortWhy(label);
   return (
     <section className="card">
@@ -148,7 +150,12 @@ function Verdict({ label, onDecided }: { label: Detail; onDecided: () => void })
           <b>Analyst decision: {decision.label.replace("_", " ").toLowerCase()}</b> (final) · {person(decision.analyst)}
         </div>
       )}
-      {user.role !== "viewer" ? (
+      {isDraftLabel ? (
+        <p className="hint" data-testid="draft-label">
+          This is a preview from draft {label.policy_version}'s Test, not a label anyone sees. Decisions are recorded on the
+          live label{live ? ` (${live})` : ""}: open it under "Label under each policy version".
+        </p>
+      ) : user.role !== "viewer" ? (
         <DecideForm labelId={label.id} onDecided={onDecided} />
       ) : (
         <p className="hint">Editors and publishers can record a decision.</p>
